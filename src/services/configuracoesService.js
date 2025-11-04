@@ -172,7 +172,7 @@ class ConfiguracoesService {
   // Método para testar conectividade com o backend
   async testarConectividade() {
     try {
-      const response = await api.get('/health');
+      const response = await api.get(API_ENDPOINTS.health);
       return response.data;
     } catch (error) {
       console.error('Backend não está disponível:', error);

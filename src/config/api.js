@@ -1,3 +1,4 @@
+import axios from 'axios';
 // Configurações da API
 
 // Configuração base da API usando variáveis de ambiente
@@ -33,6 +34,7 @@ export const API_ENDPOINTS = {
     base: `${API_BASE_URL}/api/v1/configuracoes`,
     geral: `${API_BASE_URL}/api/v1/configuracoes/geral`,
     logo: `${API_BASE_URL}/api/v1/configuracoes/logo`,
+    byType: (tipo) => `${API_BASE_URL}/api/v1/configuracoes/${tipo}`,
   },
 
   // Usuários
@@ -98,11 +100,12 @@ export const API_ENDPOINTS = {
   },
   
   // Health check
-  health: 'http://localhost:3001/health',
+  health: `${API_BASE_URL}/health`,
 };
 
 // Configurações padrão do axios
 export const API_CONFIG = {
+  baseURL: API_BASE_URL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -123,10 +126,27 @@ export const getAuthHeaders = () => {
   };
 };
 
-export default {
-  API_BASE_URL,
-  API_ENDPOINTS,
-  API_CONFIG,
-  getAuthToken,
-  getAuthHeaders,
-};
+// Criar instância do axios com baseURL e interceptors
+const api = axios.create(API_CONFIG);
+
+api.interceptors.request.use(
+  (config) => {
+    const authHeaders = getAuthHeaders();
+    config.headers = { ...config.headers, ...authHeaders };
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.error('Erro na API:', error);
+    if (error.response?.status === 401) {
+      localStorage.removeItem('saas_auth_token');
+    }
+    return Promise.reject(error);
+  }
+);
+
+export default api;
