@@ -1,0 +1,42 @@
+import express, { Request, Response } from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { connectToMongo } from './database.js';
+import clientesRouter from './routes/clientes.js';
+import realstateRouter from './routes/realstate.js';
+import analysisRouter from './routes/analysis.js';
+import searchRouter from './routes/search.js';
+import reportRouter from './routes/report.js';
+
+dotenv.config();
+
+const app = express();
+const PORT: number = Number(process.env.PORT) || 8003;
+
+// Middlewares
+app.use(cors());
+app.use(express.json());
+
+// Routes
+app.use('/api/v1', clientesRouter);
+app.use('/api/v1', realstateRouter);
+app.use('/api/v1', analysisRouter);
+app.use('/api/v1', searchRouter);
+app.use('/api/v1', reportRouter);
+
+app.get('/', (req: Request, res: Response) => {
+  res.json({ message: 'Welcome to Real Estate Audit Service API (Node.js, TS)' });
+});
+
+// Start server after DB is connected
+(async () => {
+  try {
+    await connectToMongo();
+    app.listen(PORT, () => {
+      console.log(`🚀 Node TS server running on http://localhost:${PORT}`);
+    });
+  } catch (err) {
+    console.error('❌ Failed to start server:', err);
+    process.exit(1);
+  }
+})();
