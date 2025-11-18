@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import authService from '../services/authService';
 import Modal from './Modal';
 
 const PrivacidadeLGPD = ({ isOpen, onClose }) => {
@@ -28,10 +27,7 @@ const PrivacidadeLGPD = ({ isOpen, onClose }) => {
     try {
       setLoading(true);
       
-      if (!authService.isAuthenticated()) {
-        setError('Usuário não autenticado');
-        return;
-      }
+      
 
       // Carregar consentimentos salvos do localStorage ou API
       const savedConsents = localStorage.getItem('lgpd_consentimentos');
@@ -90,10 +86,7 @@ const PrivacidadeLGPD = ({ isOpen, onClose }) => {
     try {
       setLoading(true);
       
-      if (!authService.isAuthenticated()) {
-        setError('Usuário não autenticado');
-        return;
-      }
+      
 
       // Simular exportação de dados
       const dadosUsuario = {
@@ -142,10 +135,7 @@ const PrivacidadeLGPD = ({ isOpen, onClose }) => {
     try {
       setLoading(true);
       
-      if (!authService.isAuthenticated()) {
-        setError('Usuário não autenticado');
-        return;
-      }
+      
 
       // Simular solicitação de exclusão
       const solicitacao = {

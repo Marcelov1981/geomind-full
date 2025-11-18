@@ -1,33 +1,24 @@
 import axios from 'axios';
-// Configurações da API
 
-// Configuração base da API usando variáveis de ambiente
 const API_BASE_URL_DEV = 'http://localhost:3001';
 const API_BASE_URL_PROD = import.meta.env.VITE_API_BASE_URL || 'https://your-backend-url.com';
 
-// Configuração para desenvolvimento
 const DEV_CONFIG = {
   baseURL: API_BASE_URL_DEV,
   timeout: 30000,
 };
 
-// Configuração para produção
 const PROD_CONFIG = {
   baseURL: API_BASE_URL_PROD,
   timeout: 30000,
 };
 
-// Selecionar configuração baseada no ambiente
-// Se VITE_API_BASE_URL estiver definida, usar configuração de produção mesmo em desenvolvimento
 const config = (import.meta.env.MODE === 'production' || import.meta.env.VITE_API_BASE_URL) ? PROD_CONFIG : DEV_CONFIG;
 const API_BASE_URL = config.baseURL;
 
 export const API_BASE_URL_EXPORT = config.baseURL;
-
-// URL base da API local (mantido para compatibilidade)
 export { API_BASE_URL_EXPORT as API_BASE_URL };
 
-// URLs dos endpoints
 export const API_ENDPOINTS = {
   // Configurações
   configuracoes: {
@@ -103,7 +94,6 @@ export const API_ENDPOINTS = {
   health: `${API_BASE_URL}/health`,
 };
 
-// Configurações padrão do axios
 export const API_CONFIG = {
   baseURL: API_BASE_URL,
   timeout: 30000,
@@ -112,41 +102,5 @@ export const API_CONFIG = {
   },
 };
 
-// Função para obter token de autenticação
-export const getAuthToken = () => {
-  return localStorage.getItem('saas_auth_token');
-};
-
-// Função para configurar headers de autenticação
-export const getAuthHeaders = () => {
-  const token = localStorage.getItem('saas_auth_token');
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` })
-  };
-};
-
-// Criar instância do axios com baseURL e interceptors
 const api = axios.create(API_CONFIG);
-
-api.interceptors.request.use(
-  (config) => {
-    const authHeaders = getAuthHeaders();
-    config.headers = { ...config.headers, ...authHeaders };
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    console.error('Erro na API:', error);
-    if (error.response?.status === 401) {
-      localStorage.removeItem('saas_auth_token');
-    }
-    return Promise.reject(error);
-  }
-);
-
 export default api;

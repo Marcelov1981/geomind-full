@@ -1,36 +1,7 @@
 import axios from 'axios';
-import { API_ENDPOINTS, API_CONFIG, getAuthHeaders } from '../config/api.js';
+import { API_ENDPOINTS, API_CONFIG } from '../config/api.js';
 
-// Configurar axios com configurações padrão
 const api = axios.create(API_CONFIG);
-
-// Interceptor para adicionar token de autenticação
-api.interceptors.request.use(
-  (config) => {
-    const authHeaders = getAuthHeaders();
-    config.headers = { ...config.headers, ...authHeaders };
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Interceptor para tratar respostas
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    console.error('Erro na API:', error);
-    
-    // Se for erro 401, remover token e redirecionar para login
-    if (error.response?.status === 401) {
-      localStorage.removeItem('authToken');
-      // Aqui você pode adicionar lógica para redirecionar para login
-    }
-    
-    return Promise.reject(error);
-  }
-);
 
 class ConfiguracoesService {
   // Buscar todas as configurações

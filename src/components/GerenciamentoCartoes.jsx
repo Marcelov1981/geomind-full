@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Form, Input, Button, Typography, List, Modal, message, Space, Tag, Popconfirm } from 'antd';
 import { CreditCardOutlined, PlusOutlined, EditOutlined, DeleteOutlined, LockOutlined } from '@ant-design/icons';
-import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 
 const { Title, Text } = Typography;
@@ -19,25 +18,14 @@ const GerenciamentoCartoes = ({ onCardSaved, onCardDeleted }) => {
 
   const carregarCartoes = async () => {
     try {
-      const token = localStorage.getItem('saas_auth_token');
-      if (!token) return;
-      
-      const response = await axios.get(`${API_BASE_URL}/cartoes`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.data && response.data.success) {
-        setCartoes(response.data.cartoes || []);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar cartões:', error);
-      // Fallback para localStorage em caso de erro
       const cartoesStorage = localStorage.getItem('cartoes');
       if (cartoesStorage) {
         setCartoes(JSON.parse(cartoesStorage));
+      } else {
+        setCartoes([]);
       }
+    } catch (error) {
+      console.error('Erro ao carregar cartões:', error);
     }
   };
 
@@ -46,12 +34,6 @@ const GerenciamentoCartoes = ({ onCardSaved, onCardDeleted }) => {
   const handleSaveCard = async (values) => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('saas_auth_token');
-      if (!token) {
-        message.error('Usuário não autenticado.');
-        return;
-      }
-      
       const dadosCartao = {
         numero: values.numero.replace(/\s/g, ''),
         nome: values.nome,
@@ -60,49 +42,21 @@ const GerenciamentoCartoes = ({ onCardSaved, onCardDeleted }) => {
         principal: cartoes.length === 0 || values.principal
       };
       
-      let response;
+      let novosCartoes = [...cartoes];
       if (editingCard) {
-        response = await axios.put(`${API_BASE_URL}/cartoes/${editingCard.id}`, dadosCartao, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        novosCartoes = novosCartoes.map(c => c.id === editingCard.id ? { ...editingCard, ...dadosCartao } : c);
       } else {
-        response = await axios.post(`${API_BASE_URL}/cartoes`, dadosCartao, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        novosCartoes.push({ id: crypto.randomUUID(), ...dadosCartao });
       }
-      
-      if (response.data && response.data.success) {
-        const novoCartao = response.data.cartao;
-        
-        // Recarregar cartões do backend
-        await carregarCartoes();
-        
-        message.success(editingCard ? 'Cartão atualizado com sucesso!' : 'Cartão cadastrado com sucesso!');
-        
-        if (onCardSaved) {
-          onCardSaved(novoCartao);
-        }
-        
-        setModalVisible(false);
-        setEditingCard(null);
-        form.resetFields();
-      } else {
-        message.error(response.data?.message || 'Erro ao salvar cartão.');
-      }
-    } catch (error) {
-      if (error.response?.status === 400) {
-        message.error(error.response.data?.message || 'Dados do cartão inválidos.');
-      } else if (error.response?.status === 401) {
-        message.error('Sessão expirada. Faça login novamente.');
-      } else {
-        message.error('Erro ao salvar cartão. Tente novamente.');
-      }
+      localStorage.setItem('cartoes', JSON.stringify(novosCartoes));
+      setCartoes(novosCartoes);
+      message.success(editingCard ? 'Cartão atualizado com sucesso!' : 'Cartão cadastrado com sucesso!');
+      if (onCardSaved) onCardSaved(dadosCartao);
+      setModalVisible(false);
+      setEditingCard(null);
+      form.resetFields();
+    } catch {
+      message.error('Erro ao salvar cartão. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -110,36 +64,13 @@ const GerenciamentoCartoes = ({ onCardSaved, onCardDeleted }) => {
 
   const handleDeleteCard = async (cartaoId) => {
     try {
-      const token = localStorage.getItem('saas_auth_token');
-      if (!token) {
-        message.error('Usuário não autenticado.');
-        return;
-      }
-      
-      const response = await axios.delete(`${API_BASE_URL}/cartoes/${cartaoId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.data && response.data.success) {
-        // Recarregar cartões do backend
-        await carregarCartoes();
-        
-        if (onCardDeleted) {
-          onCardDeleted(cartaoId);
-        }
-        
-        message.success('Cartão removido com sucesso!');
-      } else {
-        message.error(response.data?.message || 'Erro ao remover cartão.');
-      }
-    } catch (error) {
-      if (error.response?.status === 401) {
-        message.error('Sessão expirada. Faça login novamente.');
-      } else {
-        message.error('Erro ao remover cartão.');
-      }
+      const novosCartoes = cartoes.filter(c => c.id !== cartaoId);
+      localStorage.setItem('cartoes', JSON.stringify(novosCartoes));
+      setCartoes(novosCartoes);
+      if (onCardDeleted) onCardDeleted(cartaoId);
+      message.success('Cartão removido com sucesso!');
+    } catch {
+      message.error('Erro ao remover cartão.');
     }
   };
 

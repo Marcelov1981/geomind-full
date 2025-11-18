@@ -4,8 +4,7 @@ import Modal from './Modal';
 import ImageUpload from './ImageUpload';
 import CepService from '../utils/CepService';
 import { useProject } from '../hooks/useProject';
-import { API_ENDPOINTS, getAuthHeaders } from '../config/api';
-import authService from '../services/authService';
+import { API_ENDPOINTS } from '../config/api';
 
 const NovoProjeto = ({ isOpen, onClose, onProjetoCreated }) => {
   const { setProject, projectData } = useProject();
@@ -22,7 +21,8 @@ const NovoProjeto = ({ isOpen, onClose, onProjetoCreated }) => {
     area_construida: '',
     finalidade_avaliacao: 'compra_venda',
     prazo_entrega: '',
-    observacoes: ''
+    observacoes: '',
+    status: 'New'
   });
   const [clientes, setClientes] = useState([]);
   const [images, setImages] = useState([]);
@@ -49,16 +49,7 @@ const NovoProjeto = ({ isOpen, onClose, onProjetoCreated }) => {
   const fetchClientes = async () => {
     setLoadingClientes(true);
     try {
-      // Verificar se está autenticado
-      if (!authService.isAuthenticated()) {
-        console.error('Usuário não autenticado');
-        setError('Usuário não autenticado');
-        return;
-      }
-      
-      const response = await axios.get(API_ENDPOINTS.clientes.base, {
-        headers: getAuthHeaders()
-      });
+      const response = await axios.get(API_ENDPOINTS.clientes.base, { params: { t: Date.now() } });
       
       // Verificar se a resposta tem o formato esperado
       if (response.data.success) {
@@ -131,18 +122,10 @@ const NovoProjeto = ({ isOpen, onClose, onProjetoCreated }) => {
     setError('');
 
     try {
-      // Verificar se está autenticado
-      if (!authService.isAuthenticated()) {
-        setError('Usuário não autenticado');
-        return;
-      }
-      
       const response = await axios.post(
         API_ENDPOINTS.projetos.base,
         formData,
-        {
-          headers: getAuthHeaders()
-        }
+        {}
       );
       
       // Definir projeto ativo no contexto
@@ -161,7 +144,8 @@ const NovoProjeto = ({ isOpen, onClose, onProjetoCreated }) => {
         area_construida: '',
         finalidade_avaliacao: 'compra_venda',
         prazo_entrega: '',
-        observacoes: ''
+        observacoes: '',
+        status: 'New'
       });
       setImages([]);
       

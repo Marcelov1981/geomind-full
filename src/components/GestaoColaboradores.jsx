@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { API_ENDPOINTS } from '../config/api';
-import axios from 'axios';
 
 const GestaoColaboradores = () => {
   const [colaboradores, setColaboradores] = useState([]);
@@ -23,11 +21,8 @@ const GestaoColaboradores = () => {
   const carregarColaboradores = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('saas_auth_token');
-      const response = await axios.get(API_ENDPOINTS.usuarios.colaboradores, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setColaboradores(response.data.colaboradores);
+      const saved = JSON.parse(localStorage.getItem('colaboradores') || '[]');
+      setColaboradores(saved);
     } catch (error) {
       console.error('Erro ao carregar colaboradores:', error);
       setError('Erro ao carregar colaboradores');
@@ -56,29 +51,17 @@ const GestaoColaboradores = () => {
 
     try {
       setLoading(true);
-      const token = localStorage.getItem('saas_auth_token');
-      const response = await axios.post(API_ENDPOINTS.usuarios.colaborador, formData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      // Mostrar senha temporária gerada
-      if (response.data.senhaTemporaria) {
-        setSenhaTemporaria(response.data.senhaTemporaria);
-        setSuccess(`Colaborador criado com sucesso! Senha temporária: ${response.data.senhaTemporaria}`);
-      } else {
-        setSuccess('Colaborador criado com sucesso!');
-      }
-      
-      setFormData({
-        nome: '',
-        email: '',
-        telefone: '',
-        cargo: ''
-      });
+      const novo = { ...formData, id: crypto.randomUUID(), status: 'ativo' };
+      const saved = JSON.parse(localStorage.getItem('colaboradores') || '[]');
+      saved.push(novo);
+      localStorage.setItem('colaboradores', JSON.stringify(saved));
+      setSenhaTemporaria('temp1234');
+      setSuccess('Colaborador criado com sucesso!');
+      setFormData({ nome: '', email: '', telefone: '', cargo: '' });
       carregarColaboradores();
     } catch (error) {
       console.error('Erro ao criar colaborador:', error);
-      setError(error.response?.data?.message || 'Erro ao criar colaborador');
+      setError('Erro ao criar colaborador');
     } finally {
       setLoading(false);
     }

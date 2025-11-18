@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import axios from 'axios';
-import { API_ENDPOINTS, getAuthHeaders } from '../config/api';
+import { API_ENDPOINTS } from '../config/api';
 import { addLogoToPDF } from '../utils/LogoUtils.jsx';
 
 const LaudoPDF = ({ avaliacao, onClose }) => {
@@ -25,9 +25,7 @@ const LaudoPDF = ({ avaliacao, onClose }) => {
   useEffect(() => {
     const carregarDadosUsuario = async () => {
       try {
-        const response = await axios.get(API_ENDPOINTS.usuarios.profile, {
-          headers: getAuthHeaders()
-        });
+        const response = await axios.get(API_ENDPOINTS.usuarios.profile);
         
         const usuario = response.data.user;
         if (usuario) {

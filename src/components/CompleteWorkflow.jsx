@@ -112,7 +112,7 @@ const CompleteWorkflow = () => {
         descricao: values.descricao,
         endereco: values.endereco,
         cliente_id: selectedCliente.id,
-        status: 'ativo'
+        status: 'New'
       };
       
       // Validar dados do projeto

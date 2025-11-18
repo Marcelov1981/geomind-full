@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { API_ENDPOINTS, getAuthHeaders } from '../config/api';
-import authService from '../services/authService';
+import { API_ENDPOINTS } from '../config/api';
 import EditarCliente from './EditarCliente';
 
 function Clientes() {
@@ -17,15 +16,7 @@ function Clientes() {
         setLoading(true);
         setError(null);
         
-        // Verificar se está autenticado
-        if (!authService.isAuthenticated()) {
-          setError("Usuário não autenticado");
-          return;
-        }
-        
-        const response = await axios.get(API_ENDPOINTS.clientes.base, {
-          headers: getAuthHeaders()
-        });
+        const response = await axios.get(API_ENDPOINTS.clientes.base);
         
         console.log("Dados recebidos:", response.data); // Debug
         
@@ -37,11 +28,7 @@ function Clientes() {
         }
       } catch (error) {
         console.error("Erro ao buscar clientes:", error);
-        if (error.response?.status === 401) {
-          setError("Sessão expirada. Faça login novamente.");
-        } else {
-          setError("Erro ao carregar clientes. Tente novamente mais tarde.");
-        }
+        setError("Erro ao carregar clientes. Tente novamente mais tarde.");
       } finally {
         setLoading(false);
       }

@@ -14,27 +14,19 @@ export const getLogoConfig = async () => {
   }
 
   try {
-    const token = localStorage.getItem('saas_auth_token');
-    // Só faz requisição se estiver autenticado e o backend estiver disponível (não for placeholder)
-    if (token && API_BASE_URL.includes('localhost:3001') && !API_BASE_URL.includes('your-backend-url.com')) {
-      const response = await fetch(`${API_BASE_URL}/configuracoes/logo`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
+    if (API_BASE_URL.includes('localhost:3001') && !API_BASE_URL.includes('your-backend-url.com')) {
+      const response = await fetch(`${API_BASE_URL}/configuracoes/logo`);
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.data) {
-          // Salvar no cache
           logoCache.set(data.data);
           return data.data;
         }
       }
     }
   } catch (error) {
-     console.log('Erro ao carregar configurações da API, usando localStorage:', error.message);
-   }
+    console.log('Erro ao carregar configurações da API, usando localStorage:', error.message);
+  }
   
   // Fallback para localStorage
   const fallbackConfig = {

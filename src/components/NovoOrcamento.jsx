@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { API_ENDPOINTS, getAuthHeaders } from '../config/api';
-import authService from '../services/authService';
+import { API_ENDPOINTS } from '../config/api';
 import Modal from './Modal';
 import { useProject } from '../hooks/useProject';
 import ImageUpload from './ImageUpload';
@@ -62,15 +61,7 @@ const NovoOrcamento = ({ isOpen, onClose, onOrcamentoCreated }) => {
   const fetchProjetos = async () => {
     setLoadingProjetos(true);
     try {
-      // Verificar se está autenticado
-      if (!authService.isAuthenticated()) {
-        setError('Usuário não autenticado');
-        return;
-      }
-      
-      const response = await axios.get(API_ENDPOINTS.realstate.base, {
-        headers: getAuthHeaders()
-      });
+      const response = await axios.get(API_ENDPOINTS.realstate.base);
       
       // Verificar se a resposta tem o formato esperado
       if (response.data.success) {
@@ -104,21 +95,13 @@ const NovoOrcamento = ({ isOpen, onClose, onOrcamentoCreated }) => {
     setError('');
 
     try {
-      // Verificar se está autenticado
-      if (!authService.isAuthenticated()) {
-        setError('Usuário não autenticado');
-        return;
-      }
-      
       const response = await axios.post(
         API_ENDPOINTS.orcamentos.base,
         {
           ...formData,
           valorEstimado: parseFloat(formData.valorEstimado) || 0
         },
-        {
-          headers: getAuthHeaders()
-        }
+        {}
       );
 
       if (response.status === 201 || response.status === 200) {
@@ -142,11 +125,7 @@ const NovoOrcamento = ({ isOpen, onClose, onOrcamentoCreated }) => {
       }
     } catch (error) {
       console.error('Erro ao criar orçamento:', error);
-      if (error.response?.status === 401) {
-        setError('Sessão expirada. Faça login novamente.');
-      } else {
-        setError(error.response?.data?.message || 'Erro ao criar orçamento');
-      }
+      setError(error.response?.data?.message || 'Erro ao criar orçamento');
     } finally {
       setLoading(false);
     }

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { API_ENDPOINTS, getAuthHeaders } from '../config/api';
-import authService from '../services/authService';
+import { API_ENDPOINTS } from '../config/api';
 
 function Orcamentos() {
   const [orcamentosList, setOrcamentosList] = useState([]);
@@ -14,15 +13,7 @@ function Orcamentos() {
         setLoading(true);
         setError(null);
         
-        // Verificar se está autenticado
-        if (!authService.isAuthenticated()) {
-          setError("Usuário não autenticado");
-          return;
-        }
-        
-        const response = await axios.get(API_ENDPOINTS.orcamentos.base, {
-          headers: getAuthHeaders()
-        });
+        const response = await axios.get(API_ENDPOINTS.orcamentos.base);
         
         console.log("Dados recebidos:", response.data); // Debug
         
@@ -34,11 +25,7 @@ function Orcamentos() {
         }
       } catch (error) {
         console.error("Erro ao buscar orçamentos:", error);
-        if (error.response?.status === 401) {
-          setError("Sessão expirada. Faça login novamente.");
-        } else {
-          setError("Erro ao carregar orçamentos. Tente novamente mais tarde.");
-        }
+        setError("Erro ao carregar orçamentos. Tente novamente mais tarde.");
       } finally {
         setLoading(false);
       }

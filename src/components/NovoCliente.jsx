@@ -3,8 +3,7 @@ import axios from 'axios';
 import Modal from './Modal';
 import CepService from '../utils/CepService';
 import { useProject } from '../hooks/useProject';
-import { API_ENDPOINTS, getAuthHeaders } from '../config/api';
-import authService from '../services/authService';
+import { API_ENDPOINTS } from '../config/api';
 
 const NovoCliente = ({ isOpen, onClose, onClienteCreated }) => {
   const { getProjectDataForForm, updateProjectData, hasActiveProject } = useProject();
@@ -168,18 +167,10 @@ const NovoCliente = ({ isOpen, onClose, onClienteCreated }) => {
     setError('');
 
     try {
-      // Verificar se está autenticado
-      if (!authService.isAuthenticated()) {
-        setError('Usuário não autenticado');
-        return;
-      }
-
       const response = await axios.post(
         API_ENDPOINTS.clientes.base,
         formData,
-        {
-          headers: getAuthHeaders()
-        }
+        {}
       );
       
       // Salvar dados do cliente no contexto se há projeto ativo
@@ -212,11 +203,7 @@ const NovoCliente = ({ isOpen, onClose, onClienteCreated }) => {
       onClose();
     } catch (err) {
       console.error('Erro ao criar cliente:', err);
-      if (err.response?.status === 401) {
-        setError('Sessão expirada. Faça login novamente.');
-      } else {
-        setError('Erro ao criar cliente. Tente novamente.');
-      }
+      setError('Erro ao criar cliente. Tente novamente.');
     } finally {
       setLoading(false);
     }

@@ -90,29 +90,11 @@ const ConfiguracaoLogo = ({ isOpen, onClose }) => {
   const saveLogoConfig = async () => {
     setSaving(true);
     try {
-      const token = localStorage.getItem('saas_auth_token');
-      // Só faz requisição se estiver autenticado e o backend estiver disponível (não for placeholder)
-      if (token && API_BASE_URL.includes('localhost:3001') && !API_BASE_URL.includes('your-backend-url.com')) {
-        const response = await fetch(`${API_BASE_URL}/configuracoes/logo`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(logoConfig)
-        });
-        
-        if (response.ok) {
-          // Invalidar cache após salvar
-          invalidateLogoCache();
-          message.success('Configurações de logo salvas com sucesso!');
-        } else {
-          throw new Error('Erro ao salvar configurações');
-        }
-      }
+      invalidateLogoCache();
+      message.success('Configurações de logo salvas localmente!');
     } catch (err) {
       console.error('Erro ao salvar configurações:', err);
-      message.error('Erro ao salvar configurações. Usando armazenamento local.');
+      message.error('Erro ao salvar configurações.');
     } finally {
       setSaving(false);
     }

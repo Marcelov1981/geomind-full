@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Modal from './Modal';
 import CepService from '../utils/CepService';
-import { API_ENDPOINTS, getAuthHeaders } from '../config/api';
-import authService from '../services/authService';
+import { API_ENDPOINTS } from '../config/api';
 
 const EditarCliente = ({ isOpen, onClose, onSuccess, cliente }) => {
   const [formData, setFormData] = useState({
@@ -98,18 +97,10 @@ const EditarCliente = ({ isOpen, onClose, onSuccess, cliente }) => {
     setError('');
 
     try {
-      // Verificar se está autenticado
-      if (!authService.isAuthenticated()) {
-        setError('Usuário não autenticado');
-        return;
-      }
-
       const response = await axios.put(
         `${API_ENDPOINTS.clientes.base}/${cliente.id}`,
         formData,
-        {
-          headers: getAuthHeaders()
-        }
+        {}
       );
       
       if (onSuccess) {
@@ -118,11 +109,7 @@ const EditarCliente = ({ isOpen, onClose, onSuccess, cliente }) => {
       
       onClose();
     } catch (err) {
-      if (err.response?.status === 401) {
-        setError('Sessão expirada. Faça login novamente.');
-      } else {
-        setError('Erro ao atualizar cliente. Tente novamente.');
-      }
+      setError('Erro ao atualizar cliente. Tente novamente.');
       console.error('Erro ao atualizar cliente:', err);
     } finally {
       setLoading(false);

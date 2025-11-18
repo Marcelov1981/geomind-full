@@ -3,8 +3,7 @@ import axios from 'axios';
 import Modal from './Modal';
 import ImageUpload from './ImageUpload';
 import CepService from '../utils/CepService';
-import { API_ENDPOINTS, getAuthHeaders } from '../config/api';
-import authService from '../services/authService';
+import { API_ENDPOINTS } from '../config/api';
 
 const EditarProjeto = ({ isOpen, onClose, onSuccess, projeto }) => {
   const [formData, setFormData] = useState({
@@ -80,16 +79,7 @@ const EditarProjeto = ({ isOpen, onClose, onSuccess, projeto }) => {
 
   const fetchClientes = async () => {
     try {
-      // Verificar se está autenticado
-      if (!authService.isAuthenticated()) {
-        console.error('Usuário não autenticado');
-        setError('Usuário não autenticado');
-        return;
-      }
-      
-      const response = await axios.get(API_ENDPOINTS.clientes.base, {
-        headers: getAuthHeaders()
-      });
+      const response = await axios.get(API_ENDPOINTS.clientes.base);
       
       // Verificar se a resposta tem o formato esperado
       if (response.data.success) {
@@ -166,15 +156,7 @@ const EditarProjeto = ({ isOpen, onClose, onSuccess, projeto }) => {
         images: images
       };
 
-      // Verificar se está autenticado
-      if (!authService.isAuthenticated()) {
-        setError('Usuário não autenticado');
-        return;
-      }
-      
-      await axios.put(`${API_ENDPOINTS.projetos.base}/${projeto.id}`, projetoData, {
-        headers: getAuthHeaders()
-      });
+      await axios.put(`${API_ENDPOINTS.projetos.base}/${projeto.id}`, projetoData);
       
       onSuccess();
       onClose();

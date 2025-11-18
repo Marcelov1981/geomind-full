@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import Clientes from './components/Cliente';
 import Orcamentos from './components/Orçamentos';
 import Projetos from './components/Projetos';
@@ -18,7 +18,6 @@ import PlanosAssinatura from './components/PlanosAssinatura';
 import PagamentoPagina from './components/PagamentoPagina';
 import PagamentoSucesso from './components/PagamentoSucesso';
 import PerfilUsuario from './components/PerfilUsuario';
-import Autenticacao from './components/Autenticacao';
 import GerenciamentoCartoes from './components/GerenciamentoCartoes';
 import PrivacidadeLGPD from './components/PrivacidadeLGPD';
 import GerenciamentoCreditos from './components/GerenciamentoCreditos';
@@ -32,9 +31,7 @@ import { ProjectProvider } from './contexts/ProjectContext';
 import { appStyles, getSidebarStyles, otherStyles } from './styles/appStyles';
 
 const SaaSApp = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [user, setUser] = useState(null);
+  
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showNovoCliente, setShowNovoCliente] = useState(false);
@@ -49,42 +46,7 @@ const SaaSApp = () => {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [dadosNavegacao, setDadosNavegacao] = useState({});
 
-  // Verificação de autenticação ao carregar
-  useEffect(() => {
-    const savedUser = localStorage.getItem('saas_user_data');
-    const savedToken = localStorage.getItem('saas_auth_token');
-    if (savedUser && savedToken) {
-      setUser(JSON.parse(savedUser));
-      setIsAuthenticated(true);
-    }
-    setAuthLoading(false);
-  }, []);
-
-  const handleLogin = (userData, token) => {
-    console.log('handleLogin iniciado com:', userData, token);
-    
-    localStorage.setItem('saas_user_data', JSON.stringify(userData));
-    localStorage.setItem('saas_auth_token', token);
-    
-    setUser(userData);
-    setIsAuthenticated(true);
-    setAuthLoading(false);
-    
-    console.log('Login realizado com sucesso');
-  };
-
-  const handleRegister = useCallback((userData) => {
-    setUser(userData);
-    setIsAuthenticated(true);
-  }, []);
-
-  const handleLogout = useCallback(() => {
-    setIsAuthenticated(false);
-    setUser(null);
-    localStorage.removeItem('saas_user_data');
-    localStorage.removeItem('saas_auth_token');
-    setActiveSection('dashboard');
-  }, []);
+  useEffect(() => {}, []);
 
   // Reset global styles
   useEffect(() => {
@@ -213,38 +175,7 @@ const SaaSApp = () => {
         ))}
       </nav>
 
-      <div style={styles.sidebarFooter}>
-        <button
-          onClick={handleLogout}
-          style={{
-            ...styles.sidebarItem,
-            justifyContent: sidebarOpen ? 'flex-start' : 'center',
-            padding: sidebarOpen ? '12px' : '12px 8px'
-          }}
-          onMouseOver={(e) => {
-            e.target.style.backgroundColor = '#dc2626';
-            e.target.style.color = 'white';
-          }}
-          onMouseOut={(e) => {
-            e.target.style.backgroundColor = 'transparent';
-            e.target.style.color = '#cbd5e1';
-          }}
-        >
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center',
-            justifyContent: 'center',
-            minWidth: '20px'
-          }}>
-            {icons.logout}
-          </div>
-          {sidebarOpen && (
-            <span style={{ marginLeft: '12px' }}>
-              Sair
-            </span>
-          )}
-        </button>
-      </div>
+      <div />
     </div>
   );
 
@@ -666,24 +597,7 @@ const SaaSApp = () => {
     );
   };
 
-  // Renderização principal
-  console.log('Renderização principal - isAuthenticated:', isAuthenticated, 'authLoading:', authLoading, 'user:', user);
-  
-  if (authLoading) {
-    return (
-      <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh'}}>
-        <div>Carregando...</div>
-      </div>
-    );
-  }
-  
-  if (!isAuthenticated) {
-    return (
-      <div style={styles.appContainer}>
-        <Autenticacao onLogin={handleLogin} onRegister={handleRegister} />
-      </div>
-    );
-  }
+  console.log('Renderização principal');
 
   return (
     <ProjectProvider>
@@ -692,7 +606,7 @@ const SaaSApp = () => {
           <Sidebar />
           <MainContent />
         </div>
-        
+
         <NovoCliente
           isOpen={showNovoCliente}
           onClose={() => setShowNovoCliente(false)}

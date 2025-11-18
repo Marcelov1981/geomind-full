@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { API_ENDPOINTS, getAuthHeaders } from '../config/api';
-import authService from '../services/authService';
+import { API_ENDPOINTS } from '../config/api';
 import EditarProjeto from './EditarProjeto';
 
 function Projetos() {
@@ -17,20 +16,10 @@ function Projetos() {
       setLoading(true);
       setError(null);
       
-      // Verificar se está autenticado
-      if (!authService.isAuthenticated()) {
-        setError("Usuário não autenticado");
-        return;
-      }
-      
       // Buscar projetos e clientes em paralelo
       const [projetosResponse, clientesResponse] = await Promise.all([
-        axios.get(API_ENDPOINTS.projetos.base, {
-          headers: getAuthHeaders()
-        }),
-        axios.get(API_ENDPOINTS.clientes.base, {
-          headers: getAuthHeaders()
-        })
+        axios.get(API_ENDPOINTS.projetos.base, { params: { t: Date.now() } }),
+        axios.get(API_ENDPOINTS.clientes.base, { params: { t: Date.now() } })
       ]);
       
       console.log("Dados de projetos recebidos:", projetosResponse.data);
@@ -50,11 +39,7 @@ function Projetos() {
       }
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
-      if (error.response?.status === 401) {
-        setError("Sessão expirada. Faça login novamente.");
-      } else {
-        setError("Erro ao carregar dados. Tente novamente mais tarde.");
-      }
+      setError("Erro ao carregar dados. Tente novamente mais tarde.");
     } finally {
       setLoading(false);
     }
@@ -68,6 +53,16 @@ function Projetos() {
   const getClienteNome = (clienteId) => {
     const cliente = clientesList.find(c => c.id === clienteId);
     return cliente ? cliente.nome : 'Cliente não encontrado';
+  };
+
+  const getEndereco = (projeto) => projeto.endereco_imovel || projeto.endereco || 'N/A';
+  const getCidade = (projeto) => projeto.cidade_imovel || projeto.cidade || 'N/A';
+  const getEstado = (projeto) => projeto.estado_imovel || projeto.estado || 'N/A';
+  const getCep = (projeto) => projeto.cep_imovel || projeto.cep || 'N/A';
+  const getFinalidade = (projeto) => projeto.finalidade_avaliacao || projeto.finalidade || 'N/A';
+  const getPrazo = (projeto) => {
+    const data = projeto.prazo_entrega || projeto.prazoEntrega;
+    return data ? new Date(data).toLocaleDateString('pt-BR') : 'N/A';
   };
 
   if (loading) {
@@ -103,14 +98,14 @@ function Projetos() {
           <td>{projeto.nome || 'N/A'}</td>
           <td>{getClienteNome(projeto.cliente_id)}</td>
           <td>{projeto.tipo_imovel || 'N/A'}</td>
-          <td>{projeto.endereco_imovel || 'N/A'}</td>
-          <td>{projeto.cidade_imovel || 'N/A'}</td>
-          <td>{projeto.estado_imovel || 'N/A'}</td>
-          <td>{projeto.cep_imovel || 'N/A'}</td>
+          <td>{getEndereco(projeto)}</td>
+          <td>{getCidade(projeto)}</td>
+          <td>{getEstado(projeto)}</td>
+          <td>{getCep(projeto)}</td>
           <td>{projeto.area_terreno ? `${projeto.area_terreno} m²` : 'N/A'}</td>
           <td>{projeto.area_construida ? `${projeto.area_construida} m²` : 'N/A'}</td>
-          <td>{projeto.finalidade_avaliacao || 'N/A'}</td>
-          <td>{projeto.prazo_entrega ? new Date(projeto.prazo_entrega).toLocaleDateString('pt-BR') : 'N/A'}</td>
+          <td>{getFinalidade(projeto)}</td>
+          <td>{getPrazo(projeto)}</td>
           <td>
             <button 
               onClick={() => {
