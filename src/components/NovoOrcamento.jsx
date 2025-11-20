@@ -61,21 +61,30 @@ const NovoOrcamento = ({ isOpen, onClose, onOrcamentoCreated }) => {
   const fetchProjetos = async () => {
     setLoadingProjetos(true);
     try {
-      const response = await axios.get(API_ENDPOINTS.realstate.base);
-      
-      // Verificar se a resposta tem o formato esperado
-      if (response.data.success) {
-        setProjetos(response.data.data || []);
-      } else {
-        setProjetos(response.data || []);
-      }
+      const projetosResponse = await axios.get(API_ENDPOINTS.projetos.base, { params: { t: Date.now() } });
+      const projetosData = projetosResponse.data?.data || projetosResponse.data || [];
+
+      const projetosComCliente = await Promise.all(
+        projetosData.map(async (p) => {
+          const clienteId = p.cliente_id || p.clienteId || p.cliente?.id;
+          let clienteInfo = p.cliente || null;
+          if (clienteId) {
+            try {
+              const res = await axios.get(API_ENDPOINTS.clientes.byId(clienteId), { params: { t: Date.now() } });
+              const clienteData = res.data?.data || res.data || null;
+              if (clienteData) {
+                clienteInfo = { id: clienteData.id, nome: clienteData.nome };
+              }
+            } catch {}
+          }
+          return { ...p, cliente: clienteInfo };
+        })
+      );
+
+      setProjetos(projetosComCliente);
     } catch (error) {
       console.error('Erro ao carregar projetos:', error);
-      if (error.response?.status === 401) {
-        setError('Sessão expirada. Faça login novamente.');
-      } else {
-        setError('Erro ao carregar lista de projetos');
-      }
+      setError('Erro ao carregar lista de projetos');
     } finally {
       setLoadingProjetos(false);
     }
@@ -232,7 +241,7 @@ const NovoOrcamento = ({ isOpen, onClose, onOrcamentoCreated }) => {
             >
               <option value="">Selecione um projeto</option>
               {projetos.map(projeto => (
-                <option key={projeto._id} value={projeto._id}>
+                <option key={projeto._id || projeto.id} value={projeto._id || projeto.id}>
                   {projeto.nome} - {projeto.cliente?.nome || 'Cliente não informado'}
                 </option>
               ))}

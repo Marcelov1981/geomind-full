@@ -11,6 +11,15 @@ export interface ProjetoDoc {
   descricao?: string | null;
   cliente_id?: ObjectId | string | null;
   status: string;
+  tipo_imovel?: string;
+  endereco_imovel?: string;
+  cidade_imovel?: string;
+  estado_imovel?: string;
+  cep_imovel?: string;
+  area_terreno?: number;
+  area_construida?: number;
+  finalidade_avaliacao?: string;
+  prazo_entrega?: string;
   created_at: Date;
   updated_at?: Date | null;
 }
@@ -22,6 +31,15 @@ function toResponse(doc: ProjetoDoc) {
     descricao: doc.descricao ?? null,
     cliente_id: ((doc.cliente_id as any)?.toString?.() || (doc as any).cliente_id) ?? null,
     status: doc.status,
+    tipo_imovel: doc.tipo_imovel ?? '',
+    endereco_imovel: doc.endereco_imovel ?? '',
+    cidade_imovel: doc.cidade_imovel ?? '',
+    estado_imovel: doc.estado_imovel ?? '',
+    cep_imovel: doc.cep_imovel ?? '',
+    area_terreno: doc.area_terreno ?? 0,
+    area_construida: doc.area_construida ?? 0,
+    finalidade_avaliacao: doc.finalidade_avaliacao ?? '',
+    prazo_entrega: doc.prazo_entrega ?? '',
     created_at: doc.created_at,
     updated_at: doc.updated_at ?? null,
   };
@@ -59,6 +77,15 @@ router.post('/projetos', async (req: Request, res: Response) => {
       descricao: payload.descricao ?? null,
       cliente_id: clienteRef,
       status: String(payload.status),
+      tipo_imovel: String(payload.tipo_imovel ?? ''),
+      endereco_imovel: String(payload.endereco_imovel ?? ''),
+      cidade_imovel: String(payload.cidade_imovel ?? ''),
+      estado_imovel: String(payload.estado_imovel ?? ''),
+      cep_imovel: String(payload.cep_imovel ?? ''),
+      area_terreno: payload.area_terreno != null ? Number(payload.area_terreno) : 0,
+      area_construida: payload.area_construida != null ? Number(payload.area_construida) : 0,
+      finalidade_avaliacao: String(payload.finalidade_avaliacao ?? ''),
+      prazo_entrega: String(payload.prazo_entrega ?? ''),
       created_at: now,
       updated_at: null,
     } as any;

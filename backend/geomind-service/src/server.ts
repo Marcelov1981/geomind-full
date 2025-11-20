@@ -9,6 +9,7 @@ import searchRouter from './routes/search.js';
 import reportRouter from './routes/report.js';
 import authRouter from './routes/auth.js';
 import projetosRouter from './routes/projetos.js';
+import orcamentoRouter from './routes/orcamento.js';
 
 dotenv.config();
 
@@ -27,6 +28,7 @@ app.use('/api/v1', searchRouter);
 app.use('/api/v1', reportRouter);
 app.use('/api/v1', authRouter);
 app.use('/api/v1', projetosRouter);
+app.use('/api/v1', orcamentoRouter);
 
 app.get('/', (req: Request, res: Response) => {
   res.json({ message: 'Welcome to Real Estate Audit Service API (Node.js, TS)' });

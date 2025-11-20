@@ -92,4 +92,21 @@ router.post('/clientes', async (req: Request, res: Response) => {
   }
 });
 
+router.get('/clientes/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { ObjectId } = await import('mongodb');
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ detail: 'Invalid cliente ID format' });
+    }
+    const db = getDatabase();
+    const doc = (await db.collection('clientes').findOne({ _id: new ObjectId(id) })) as ClienteDoc | null;
+    if (!doc) return res.status(404).json({ detail: 'Cliente not found' });
+    res.json(toResponse(doc));
+  } catch (err) {
+    console.error('Error retrieving cliente by id:', err);
+    res.status(500).json({ detail: `Error retrieving cliente by id: ${String(err)}` });
+  }
+});
+
 export default router;
