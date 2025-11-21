@@ -75,7 +75,9 @@ const NovoOrcamento = ({ isOpen, onClose, onOrcamentoCreated }) => {
               if (clienteData) {
                 clienteInfo = { id: clienteData.id, nome: clienteData.nome };
               }
-            } catch {}
+            } catch {
+              return { ...p, cliente: clienteInfo };
+            }
           }
           return { ...p, cliente: clienteInfo };
         })

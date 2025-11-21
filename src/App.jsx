@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Clientes from './components/Cliente';
-import Orcamentos from './components/Orçamentos';
+import Orcamentos from './components/Orcamentos';
 import Projetos from './components/Projetos';
 import Avaliacao from './components/Avaliacao';
 import Laudos from './components/Laudos';
@@ -380,7 +380,13 @@ const SaaSApp = () => {
                   <table style={styles.table}>
                     <thead>
                       <tr>
-                        <th style={styles.tableHeader}>Email</th>
+                        <th style={styles.tableHeader}>Projeto ID</th>
+                        <th style={styles.tableHeader}>Descrição</th>
+                        <th style={styles.tableHeader}>Tipo de Avaliação</th>
+                        <th style={styles.tableHeader}>Valor Estimado</th>
+                        <th style={styles.tableHeader}>Prazo de Entrega</th>
+                        <th style={styles.tableHeader}>Metodologia</th>
+                        <th style={styles.tableHeader}>Observações</th>
                         <th style={styles.tableHeader}>Status</th>
                         <th style={styles.tableHeader}>Ações</th>
                       </tr>
