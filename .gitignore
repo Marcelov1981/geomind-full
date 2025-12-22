@@ -26,3 +26,7 @@ dist-ssr
 # Environment variables
 .env.local
 .env.production
+
+# Secrets
+.env
+backend/**/.env
