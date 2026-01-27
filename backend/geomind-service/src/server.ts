@@ -10,6 +10,8 @@ import reportRouter from './routes/report.js';
 import authRouter from './routes/auth.js';
 import projetosRouter from './routes/projetos.js';
 import orcamentoRouter from './routes/orcamento.js';
+import avaliacoesRouter from './routes/avaliacoes.js';
+import integracoesRouter from './routes/integracoes.js';
 
 dotenv.config();
 
@@ -29,9 +31,15 @@ app.use('/api/v1', reportRouter);
 app.use('/api/v1', authRouter);
 app.use('/api/v1', projetosRouter);
 app.use('/api/v1', orcamentoRouter);
+app.use('/api/v1', avaliacoesRouter);
+app.use('/api/v1', integracoesRouter);
 
 app.get('/', (req: Request, res: Response) => {
   res.json({ message: 'Welcome to Real Estate Audit Service API (Node.js, TS)' });
+});
+
+app.get('/health', (_req: Request, res: Response) => {
+  res.json({ status: 'ok' });
 });
 
 // Start server after DB is connected

@@ -108,3 +108,17 @@ router.get('/orcamentos', async (req: Request, res: Response) => {
 });
 
 export default router;
+router.get('/projetos/:id/orcamentos', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ detail: 'Invalid projeto ID format' });
+    }
+    const db = getDatabase();
+    const cursor = db.collection('orcamentos').find({ projetoId: new ObjectId(id) });
+    const docs = await cursor.toArray();
+    res.json(docs.map((d) => toResponse(d as any)));
+  } catch (err) {
+    res.status(500).json({ detail: `Error listing orcamentos by projeto: ${String(err)}` });
+  }
+});

@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import { getDatabase } from '../database.js';
+import { ObjectId } from 'mongodb';
 
 const router = express.Router();
 
@@ -41,10 +42,22 @@ function toResponse(doc: ClienteDoc) {
 }
 
 // GET /api/v1/clientes
-router.get('/clientes', async (_req: Request, res: Response) => {
+router.get('/clientes', async (req: Request, res: Response) => {
   try {
+    const skip = Number(req.query.skip ?? 0);
+    const limit = Number(req.query.limit ?? 100);
+    const status = req.query.status ? String(req.query.status) : '';
+    const cidade = req.query.cidade ? String(req.query.cidade) : '';
+    const email = req.query.email ? String(req.query.email) : '';
+
+    const query: any = {};
+    if (status) query.status = status;
+    if (cidade) query.cidade = cidade;
+    if (email) query.email = email;
+
     const db = getDatabase();
-    const clientes = (await db.collection('clientes').find({}).toArray()) as ClienteDoc[];
+    const cursor = db.collection('clientes').find(query).skip(skip).limit(limit);
+    const clientes = (await cursor.toArray()) as ClienteDoc[];
     res.json(clientes.map(toResponse));
   } catch (err) {
     console.error('Error retrieving clients:', err);
@@ -110,3 +123,35 @@ router.get('/clientes/:id', async (req: Request, res: Response) => {
 });
 
 export default router;
+router.get('/clientes/:id/projetos', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ detail: 'Invalid cliente ID format' });
+    }
+    const db = getDatabase();
+    const docs = await db.collection('projetos').find({ cliente_id: new ObjectId(id) }).toArray();
+    const projects = docs.map((doc: any) => ({
+      _id: (doc._id as any)?.toString?.() || (doc as any).id,
+      nome: doc.nome,
+      descricao: doc.descricao ?? null,
+      cliente_id: ((doc.cliente_id as any)?.toString?.() || (doc as any).cliente_id) ?? null,
+      status: doc.status,
+      tipo_imovel: doc.tipo_imovel ?? '',
+      endereco_imovel: doc.endereco_imovel ?? '',
+      cidade_imovel: doc.cidade_imovel ?? '',
+      estado_imovel: doc.estado_imovel ?? '',
+      cep_imovel: doc.cep_imovel ?? '',
+      area_terreno: doc.area_terreno ?? 0,
+      area_construida: doc.area_construida ?? 0,
+      finalidade_avaliacao: doc.finalidade_avaliacao ?? '',
+      prazo_entrega: doc.prazo_entrega ?? '',
+      created_at: doc.created_at,
+      updated_at: doc.updated_at ?? null,
+    }));
+    res.json(projects);
+  } catch (err) {
+    console.error('Error retrieving projects by cliente:', err);
+    res.status(500).json({ detail: `Error retrieving projects by cliente: ${String(err)}` });
+  }
+});

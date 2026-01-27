@@ -1,4 +1,32 @@
-import api from '../config/api';
+import api, { API_ENDPOINTS } from '../config/api';
+
+const cache = new Map();
+const TTL = 30000;
+
+function getCached(key) {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.t > TTL) { cache.delete(key); return null; }
+  return entry.v;
+}
+
+function setCached(key, value) {
+  cache.set(key, { v: value, t: Date.now() });
+}
+
+function normalizeId(doc) {
+  if (!doc) return doc;
+  const id = doc.id ?? doc._id;
+  return { id, ...doc };
+}
+
+function normalizeOrcamento(doc) {
+  if (!doc) return doc;
+  const id = doc.id ?? doc._id;
+  const valor = doc.valor ?? doc.valorEstimado;
+  const projetoId = doc.projeto_id ?? doc.projetoId;
+  return { id, valorEstimado: valor, projeto_id: projetoId, ...doc };
+}
 
 /**
  * Serviço para gerenciar relacionamentos entre entidades do sistema
@@ -9,21 +37,32 @@ class RelationshipService {
    */
   async getProjectWithRelations(projectId) {
     try {
-      const [projectResponse, orcamentosResponse, avaliacoesResponse] = await Promise.all([
-        api.get(`/projetos/${projectId}`),
-        api.get('/orcamentos'),
-        api.get('/avaliacoes')
-      ]);
+      const pKey = `projetos:${projectId}`;
+      const oKey = `orcamentos:list`;
+      const projectResponse = getCached(pKey) || await api.get(`${API_ENDPOINTS.projetos.base}/${projectId}`);
+      const orcamentosResponse = getCached(oKey) || await api.get(API_ENDPOINTS.orcamentos.base);
+      setCached(pKey, projectResponse);
+      setCached(oKey, orcamentosResponse);
 
-      const project = projectResponse.data.data;
-      const allOrcamentos = orcamentosResponse.data.data || [];
-      const allAvaliacoes = avaliacoesResponse.data.data || [];
+      const project = normalizeId(projectResponse.data?.data ?? projectResponse.data);
+      const allOrcamentos = (orcamentosResponse.data?.data ?? orcamentosResponse.data ?? []).map(normalizeOrcamento);
+      let allAvaliacoes = [];
+      try {
+        const aKey = `avaliacoes:list`;
+        const avaliacoesResponse = getCached(aKey) || await api.get(API_ENDPOINTS.avaliacoes.base);
+        setCached(aKey, avaliacoesResponse);
+        allAvaliacoes = avaliacoesResponse.data?.data ?? avaliacoesResponse.data ?? [];
+      } catch {
+        allAvaliacoes = [];
+      }
 
       // Filtrar orçamentos do projeto
-      const projectOrcamentos = allOrcamentos.filter(o => o.projeto_id === projectId);
+      const projectOrcamentos = allOrcamentos.filter(o => (o.projeto_id ?? o.projetoId) === (project.id ?? projectId));
       
       // Filtrar avaliações do projeto
-      const projectAvaliacoes = allAvaliacoes.filter(a => a.projeto_id === projectId);
+      const projectAvaliacoes = allAvaliacoes
+        .map(normalizeId)
+        .filter(a => (a.projeto_id ?? a.projetoId) === (project.id ?? projectId));
 
       return {
         ...project,
@@ -41,21 +80,32 @@ class RelationshipService {
    */
   async getOrcamentoWithRelations(orcamentoId) {
     try {
-      const [orcamentoResponse, projetosResponse, avaliacoesResponse] = await Promise.all([
-        api.get(`/orcamentos/${orcamentoId}`),
-        api.get('/projetos'),
-        api.get('/avaliacoes')
-      ]);
+      const oKey = `orcamentos:${orcamentoId}`;
+      const pKey = `projetos:list`;
+      const orcamentoResponse = getCached(oKey) || await api.get(`${API_ENDPOINTS.orcamentos.base}/${orcamentoId}`);
+      const projetosResponse = getCached(pKey) || await api.get(API_ENDPOINTS.projetos.base);
+      setCached(oKey, orcamentoResponse);
+      setCached(pKey, projetosResponse);
 
-      const orcamento = orcamentoResponse.data.data;
-      const allProjetos = projetosResponse.data.data || [];
-      const allAvaliacoes = avaliacoesResponse.data.data || [];
+      const orcamento = normalizeOrcamento(orcamentoResponse.data?.data ?? orcamentoResponse.data);
+      const allProjetos = (projetosResponse.data?.data ?? projetosResponse.data ?? []).map(normalizeId);
+      let allAvaliacoes = [];
+      try {
+        const aKey = `avaliacoes:list`;
+        const avaliacoesResponse = getCached(aKey) || await api.get(API_ENDPOINTS.avaliacoes.base);
+        setCached(aKey, avaliacoesResponse);
+        allAvaliacoes = avaliacoesResponse.data?.data ?? avaliacoesResponse.data ?? [];
+      } catch {
+        allAvaliacoes = [];
+      }
 
       // Buscar projeto relacionado
-      const relatedProject = allProjetos.find(p => p.id === orcamento.projeto_id);
+      const relatedProject = allProjetos.find(p => p.id === (orcamento.projeto_id ?? orcamento.projetoId));
       
       // Filtrar avaliações do orçamento
-      const orcamentoAvaliacoes = allAvaliacoes.filter(a => a.orcamento_id === orcamentoId);
+      const orcamentoAvaliacoes = allAvaliacoes
+        .map(normalizeId)
+        .filter(a => (a.orcamento_id ?? a.orcamentoId) === (orcamento.id ?? orcamentoId));
 
       return {
         ...orcamento,
@@ -73,19 +123,23 @@ class RelationshipService {
    */
   async getAvaliacaoWithRelations(avaliacaoId) {
     try {
-      const [avaliacaoResponse, projetosResponse, orcamentosResponse] = await Promise.all([
-        api.get(`/avaliacoes/${avaliacaoId}`),
-        api.get('/projetos'),
-        api.get('/orcamentos')
-      ]);
+      const pKey = `projetos:list`;
+      const oKey = `orcamentos:list`;
+      const projetosResponse = getCached(pKey) || await api.get(API_ENDPOINTS.projetos.base);
+      const orcamentosResponse = getCached(oKey) || await api.get(API_ENDPOINTS.orcamentos.base);
+      setCached(pKey, projetosResponse);
+      setCached(oKey, orcamentosResponse);
 
-      const avaliacao = avaliacaoResponse.data.data;
-      const allProjetos = projetosResponse.data.data || [];
-      const allOrcamentos = orcamentosResponse.data.data || [];
+      const aKey = `avaliacoes:${avaliacaoId}`;
+      const avaliacaoResponse = getCached(aKey) || await api.get(`${API_ENDPOINTS.avaliacoes.base}/${avaliacaoId}`);
+      setCached(aKey, avaliacaoResponse);
+      const avaliacao = normalizeId(avaliacaoResponse.data?.data ?? avaliacaoResponse.data);
+      const allProjetos = (projetosResponse.data?.data ?? projetosResponse.data ?? []).map(normalizeId);
+      const allOrcamentos = (orcamentosResponse.data?.data ?? orcamentosResponse.data ?? []).map(normalizeOrcamento);
 
       // Buscar projeto e orçamento relacionados
-      const relatedProject = allProjetos.find(p => p.id === avaliacao.projeto_id);
-      const relatedOrcamento = allOrcamentos.find(o => o.id === avaliacao.orcamento_id);
+      const relatedProject = allProjetos.find(p => p.id === (avaliacao.projeto_id ?? avaliacao.projetoId));
+      const relatedOrcamento = allOrcamentos.find(o => o.id === (avaliacao.orcamento_id ?? avaliacao.orcamentoId));
 
       return {
         ...avaliacao,
@@ -103,23 +157,36 @@ class RelationshipService {
    */
   async getUserCompleteData() {
     try {
-      const [projetosResponse, clientesResponse, orcamentosResponse, avaliacoesResponse] = await Promise.all([
-        api.get('/projetos'),
-        api.get('/clientes'),
-        api.get('/orcamentos'),
-        api.get('/avaliacoes')
-      ]);
+      const pKey = `projetos:list`;
+      const cKey = `clientes:list`;
+      const oKey = `orcamentos:list`;
+      const projetosResponse = getCached(pKey) || await api.get(API_ENDPOINTS.projetos.base);
+      const clientesResponse = getCached(cKey) || await api.get(API_ENDPOINTS.clientes.base);
+      const orcamentosResponse = getCached(oKey) || await api.get(API_ENDPOINTS.orcamentos.base);
+      setCached(pKey, projetosResponse);
+      setCached(cKey, clientesResponse);
+      setCached(oKey, orcamentosResponse);
 
-      const projetos = projetosResponse.data.data || [];
-      const clientes = clientesResponse.data.data || [];
-      const orcamentos = orcamentosResponse.data.data || [];
-      const avaliacoes = avaliacoesResponse.data.data || [];
+      const projetos = (projetosResponse.data?.data ?? projetosResponse.data ?? []).map(normalizeId);
+      const clientes = (clientesResponse.data?.data ?? clientesResponse.data ?? []).map(normalizeId);
+      const orcamentos = (orcamentosResponse.data?.data ?? orcamentosResponse.data ?? []).map(normalizeOrcamento);
+      let avaliacoes = [];
+      try {
+        const aKey = `avaliacoes:list`;
+        const avaliacoesResponse = getCached(aKey) || await api.get(API_ENDPOINTS.avaliacoes.base);
+        setCached(aKey, avaliacoesResponse);
+        avaliacoes = avaliacoesResponse.data?.data ?? avaliacoesResponse.data ?? [];
+      } catch {
+        avaliacoes = [];
+      }
 
       // Criar mapa de relacionamentos
       const projectsWithRelations = projetos.map(projeto => {
-        const projectOrcamentos = orcamentos.filter(o => o.projeto_id === projeto.id);
-        const projectAvaliacoes = avaliacoes.filter(a => a.projeto_id === projeto.id);
-        const relatedClient = clientes.find(c => c.id === projeto.cliente_id);
+        const pid = projeto.id;
+        const cid = projeto.cliente_id ?? projeto.clienteId;
+        const projectOrcamentos = orcamentos.filter(o => (o.projeto_id ?? o.projetoId) === pid);
+        const projectAvaliacoes = avaliacoes.map(normalizeId).filter(a => (a.projeto_id ?? a.projetoId) === pid);
+        const relatedClient = clientes.find(c => c.id === cid);
 
         return {
           ...projeto,
@@ -146,9 +213,9 @@ class RelationshipService {
    */
   async createOrcamentoForProject(projectId, orcamentoData) {
     try {
-      const response = await api.post('/orcamentos', {
+      const response = await api.post(API_ENDPOINTS.orcamentos.base, {
         ...orcamentoData,
-        projeto_id: projectId
+        projetoId: projectId
       });
       return response.data;
     } catch (error) {
@@ -162,10 +229,10 @@ class RelationshipService {
    */
   async createAvaliacaoForOrcamento(projectId, orcamentoId, avaliacaoData) {
     try {
-      const response = await api.post('/avaliacoes', {
+      const response = await api.post(API_ENDPOINTS.avaliacoes.base, {
         ...avaliacaoData,
-        projeto_id: projectId,
-        orcamento_id: orcamentoId
+        projetoId: projectId,
+        orcamentoId: orcamentoId
       });
       return response.data;
     } catch (error) {
@@ -179,35 +246,34 @@ class RelationshipService {
     */
    async createEvaluationWithRelations(evaluationData) {
      try {
-       // Criar avaliação com todos os relacionamentos
-       const response = await api.post('/avaliacoes', evaluationData);
-       
-       if (response.data.success) {
-         // Buscar dados relacionados para retornar avaliação completa
-         const completeEvaluation = await this.getAvaliacaoWithRelations(response.data.data.id);
-         return {
-           ...response,
-           data: {
-             ...response.data,
-             data: completeEvaluation
-           }
-         };
-       }
-       
-       return response;
-     } catch (error) {
-       console.error('Erro ao criar avaliação com relacionamentos:', error);
-       throw error;
-     }
-   }
+        const response = await api.post(API_ENDPOINTS.avaliacoes.base, evaluationData);
+        
+        if (response.data.success) {
+          // Buscar dados relacionados para retornar avaliação completa
+          const completeEvaluation = await this.getAvaliacaoWithRelations(response.data.data.id);
+          return {
+            ...response,
+            data: {
+              ...response.data,
+              data: completeEvaluation
+            }
+          };
+        }
+        
+        return response;
+      } catch (error) {
+        console.error('Erro ao criar avaliação com relacionamentos:', error);
+        throw error;
+      }
+    }
 
    /**
     * Cria um novo cliente com relacionamentos
     */
    async createClientWithRelations(clientData) {
      try {
-       const response = await api.post('/clientes', clientData);
-       return response;
+      const response = await api.post(API_ENDPOINTS.clientes.base, clientData);
+      return response;
      } catch (error) {
        console.error('Erro ao criar cliente:', error);
        throw error;
@@ -219,8 +285,8 @@ class RelationshipService {
     */
    async createProjectWithRelations(projectData) {
      try {
-       const response = await api.post('/projetos', projectData);
-       return response;
+      const response = await api.post(API_ENDPOINTS.projetos.base, projectData);
+      return response;
      } catch (error) {
        console.error('Erro ao criar projeto:', error);
        throw error;

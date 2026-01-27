@@ -3,12 +3,13 @@
  * Converte coordenadas em endereços e informações de localização
  */
 
+import ApiKeyStore from './ApiKeyStore.js'
+
 class GeoLocationService {
   static API_KEYS = {
-    // Múltiplas APIs para redundância
-    OPENCAGE: import.meta.env.VITE_OPENCAGE_API_KEY,
-    MAPBOX: import.meta.env.VITE_MAPBOX_API_KEY,
-    GOOGLE: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+    OPENCAGE: ApiKeyStore.get('OPENCAGE') || import.meta.env.VITE_OPENCAGE_API_KEY,
+    MAPBOX: ApiKeyStore.get('MAPBOX') || import.meta.env.VITE_MAPBOX_API_KEY,
+    GOOGLE: ApiKeyStore.get('GOOGLE_MAPS') || import.meta.env.VITE_GOOGLE_MAPS_API_KEY
   };
 
   /**

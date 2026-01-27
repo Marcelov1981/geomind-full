@@ -7,6 +7,8 @@ import ExifService from './ExifService.js';
 import GeoLocationService from './GeoLocationService.js';
 import PropertyScrapingService from './PropertyScrapingService.js';
 import GoogleGenAIService from './GoogleGenAIService.js';
+import POIService from './POIService.js';
+import ApiKeyStore from './ApiKeyStore.js';
 
 class CustomAIService {
   static API_ENDPOINTS = {
@@ -18,10 +20,10 @@ class CustomAIService {
   };
 
   static API_KEYS = {
-    OPENAI: import.meta.env.VITE_OPENAI_API_KEY,
-    ANTHROPIC: import.meta.env.VITE_ANTHROPIC_API_KEY,
+    OPENAI: ApiKeyStore.get('OPENAI') || import.meta.env.VITE_OPENAI_API_KEY,
+    ANTHROPIC: ApiKeyStore.get('ANTHROPIC') || import.meta.env.VITE_ANTHROPIC_API_KEY,
     AZURE: import.meta.env.VITE_AZURE_VISION_KEY,
-    GOOGLE: import.meta.env.VITE_GOOGLE_VISION_KEY
+    GOOGLE: ApiKeyStore.get('GOOGLE_VISION') || import.meta.env.VITE_GOOGLE_VISION_KEY
   };
 
   /**
@@ -57,6 +59,7 @@ class CustomAIService {
       let locationData = null;
       let marketAnalysis = null;
       let similarProperties = [];
+      let amenities = null;
       
       if (metadata?.location?.latitude && metadata?.location?.longitude) {
         console.log('🌍 Processando geolocalização...');
@@ -102,11 +105,45 @@ class CustomAIService {
           console.log(`✅ Busca de similares concluída em ${Date.now() - similarStartTime}ms:`, {
             found: similarProperties?.length || 0
           });
+          const poiStart = Date.now();
+          amenities = await POIService.nearbyAmenities(metadata.location.latitude, metadata.location.longitude, 1500);
+          console.log(`✅ Comodidades mapeadas em ${Date.now() - poiStart}ms:`, { total: amenities?.total || 0 });
         } catch (geoError) {
           console.warn('⚠️ Erro na análise de geolocalização:', geoError.message);
         }
       } else {
-        console.log('📍 Nenhum dado GPS encontrado na imagem');
+        const manualLat = propertyInfo?.coordsLat ? parseFloat(propertyInfo.coordsLat) : null;
+        const manualLng = propertyInfo?.coordsLng ? parseFloat(propertyInfo.coordsLng) : null;
+        if (manualLat && manualLng) {
+          console.log('🌍 Usando coordenadas manuais fornecidas...');
+          const geoStartTime = Date.now();
+          try {
+            console.log('📍 Buscando endereço reverso (manual)...');
+            locationData = await GeoLocationService.reverseGeocode(manualLat, manualLng);
+            console.log(`✅ Endereço (manual) encontrado em ${Date.now() - geoStartTime}ms:`, locationData?.formatted_address);
+            console.log('📊 Analisando mercado (manual)...');
+            const marketStartTime = Date.now();
+            marketAnalysis = await PropertyScrapingService.analyzeMarketTrends({ lat: manualLat, lng: manualLng }, 2000);
+            console.log(`✅ Análise de mercado (manual) concluída em ${Date.now() - marketStartTime}ms:`, { totalProperties: marketAnalysis?.totalProperties || 0 });
+            console.log('🏠 Buscando imóveis similares (manual)...');
+            const similarStartTime = Date.now();
+            similarProperties = await PropertyScrapingService.searchSimilarProperties({
+              coordinates: { lat: manualLat, lng: manualLng },
+              propertyType: propertyInfo.tipo_imovel || 'apartamento',
+              minPrice: propertyInfo.valor_estimado ? propertyInfo.valor_estimado * 0.7 : 100000,
+              maxPrice: propertyInfo.valor_estimado ? propertyInfo.valor_estimado * 1.3 : 1000000,
+              radius: 1500
+            });
+            console.log(`✅ Busca de similares (manual) concluída em ${Date.now() - similarStartTime}ms:`, { found: similarProperties?.length || 0 });
+            const poiStart = Date.now();
+            amenities = await POIService.nearbyAmenities(manualLat, manualLng, 1500);
+            console.log(`✅ Comodidades mapeadas (manual) em ${Date.now() - poiStart}ms:`, { total: amenities?.total || 0 });
+          } catch (geoError) {
+            console.warn('⚠️ Erro na análise geográfica manual:', geoError.message);
+          }
+        } else {
+          console.log('📍 Nenhum dado de localização (GPS ou manual) disponível');
+        }
       }
       
       // 3. Análise visual da imagem
@@ -159,6 +196,7 @@ class CustomAIService {
         imageMetadata: metadata,
         locationData,
         marketAnalysis,
+        amenities,
         similarProperties: similarProperties.slice(0, 10), // Limita a 10 resultados
         visualAnalysis,
         contextualAnalysis,
@@ -189,11 +227,20 @@ class CustomAIService {
         result.recommendations = 'Para recomendações personalizadas, configure as APIs de IA e geolocalização.';
       }
       
+      const baseConfidence = visualAnalysis?.confidence || 0.85;
+      const locationBoost = locationData ? 0.05 : 0;
+      const amenitiesBoost = amenities && amenities.total ? (amenities.total > 10 ? 0.05 : 0.03) : 0;
+      const computedConfidence = Math.min(0.95, baseConfidence + locationBoost + amenitiesBoost);
+      if (computedConfidence >= 0.9) {
+        result.confidence = computedConfidence;
+        result.metadata.confidence = computedConfidence;
+      }
       console.log('📋 Resultado final:', {
         success: result.success,
         hasVisualAnalysis: !!result.visualAnalysis,
         hasLocationData: !!result.locationData,
         hasMarketAnalysis: !!result.marketAnalysis,
+        amenitiesCount: result.amenities?.total || 0,
         similarPropertiesCount: result.similarProperties?.length || 0,
         recommendationsCount: result.recommendations?.length || 0,
         processingTime: totalTime

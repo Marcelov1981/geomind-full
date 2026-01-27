@@ -119,8 +119,19 @@ router.get('/projetos', async (req: Request, res: Response) => {
   try {
     const skip = Number(req.query.skip ?? 0);
     const limit = Number(req.query.limit ?? 100);
+    const status = req.query.status ? String(req.query.status) : '';
+    const clienteId = req.query.cliente_id ? String(req.query.cliente_id) : '';
+    const cidade = req.query.cidade ? String(req.query.cidade) : '';
+
+    const query: any = {};
+    if (status) query.status = status;
+    if (cidade) query.cidade_imovel = cidade;
+    if (clienteId && ObjectId.isValid(clienteId)) {
+      query.cliente_id = new ObjectId(clienteId);
+    }
+
     const db = getDatabase();
-    const cursor = db.collection('projetos').find({}).skip(skip).limit(limit);
+    const cursor = db.collection('projetos').find(query).skip(skip).limit(limit);
     const docs = await cursor.toArray();
     res.json(docs.map((d) => toResponse(d as any)));
   } catch (err) {

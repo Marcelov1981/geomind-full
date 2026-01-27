@@ -15,6 +15,7 @@ export async function connectToMongo(): Promise<Db> {
   await client.connect();
   db = client.db(DATABASE_NAME);
   console.log(`✅ Connected to MongoDB (URI set), db: ${DATABASE_NAME}`);
+  await ensureIndexes(db);
   return db;
 }
 
@@ -25,4 +26,19 @@ export function getDatabase(): Db {
 
 export async function closeMongoConnection(): Promise<void> {
   if (client) await client.close();
+}
+
+async function ensureIndexes(d: Db) {
+  try {
+    await d.collection('clientes').createIndex({ email: 1 });
+    await d.collection('clientes').createIndex({ status: 1 });
+    await d.collection('projetos').createIndex({ cliente_id: 1 });
+    await d.collection('projetos').createIndex({ created_at: -1 });
+    await d.collection('orcamentos').createIndex({ projetoId: 1 });
+    await d.collection('orcamentos').createIndex({ created_at: -1 });
+    await d.collection('avaliacoes').createIndex({ projeto_id: 1 });
+    await d.collection('avaliacoes').createIndex({ orcamento_id: 1 });
+    await d.collection('analyses').createIndex({ real_estate_id: 1 });
+    await d.collection('settings').createIndex({ type: 1 }, { unique: true });
+  } catch {}
 }

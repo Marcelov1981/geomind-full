@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import CustomAIService from '../utils/CustomAIService';
+import api, { API_ENDPOINTS } from '../config/api';
+import ApiKeyStore from '../utils/ApiKeyStore.js';
 import PDFGenerator from '../utils/PDFGenerator';
 import SafariNotification from './SafariNotification.jsx';
 import SafariCompatibility from '../utils/SafariCompatibility.js';
@@ -23,6 +25,8 @@ const AIImageAnalysis = () => {
   const [showReportModal, setShowReportModal] = useState(false);
   const [editableReport, setEditableReport] = useState(null);
   const [isEditingReport, setIsEditingReport] = useState(false);
+  const [apiKeys, setApiKeys] = useState({ OPENAI: '', ANTHROPIC: '', GOOGLE_VISION: '', OPENCAGE: '', MAPBOX: '', GOOGLE_MAPS: '' });
+  const [providersStatus, setProvidersStatus] = useState({ openai: false, anthropic: false, googleVision: false, geocode: false });
   
   // Estados para dados de projeto
   const [clientes, setClientes] = useState([]);
@@ -39,21 +43,32 @@ const AIImageAnalysis = () => {
     tipo: '',
     areaTerreno: '',
     areaConstruida: '',
-    finalidade: ''
+    finalidade: '',
+    coordsLat: '',
+    coordsLng: ''
   });
 
   // Manipula upload de imagens
   const handleImageUpload = (event) => {
-    const files = Array.from(event.target.files);
-    const imageFiles = files.filter(file => file.type.startsWith('image/'));
-    
-    if (imageFiles.length !== files.length) {
-      setError('Apenas arquivos de imagem são permitidos.');
+    const files = Array.from(event.target.files || []);
+    const allowedExt = ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif', '.heic', '.heif'];
+    const imageFiles = files.filter(file => {
+      const name = (file.name || '').toLowerCase();
+      const hasType = (file.type || '').startsWith('image/');
+      const hasExt = allowedExt.some(ext => name.endsWith(ext));
+      return hasType || hasExt;
+    });
+
+    if (!imageFiles.length) {
+      setError('Não foi possível carregar as imagens. Formato não suportado.');
       return;
     }
-    
+
     setImages(prev => [...prev, ...imageFiles]);
     setError('');
+    if (event.target) {
+      event.target.value = null;
+    }
   };
 
   // Remove imagem
@@ -62,13 +77,49 @@ const AIImageAnalysis = () => {
   };
 
   const handleDatabaseImageUpload = (event) => {
-    const files = Array.from(event.target.files);
-    setDatabaseImages(prev => [...prev, ...files]);
+    const files = Array.from(event.target.files || []);
+    const allowedExt = ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif', '.heic', '.heif'];
+    const imageFiles = files.filter(file => {
+      const name = (file.name || '').toLowerCase();
+      const hasType = (file.type || '').startsWith('image/');
+      const hasExt = allowedExt.some(ext => name.endsWith(ext));
+      return hasType || hasExt;
+    });
+    if (!imageFiles.length) {
+      setError('Não foi possível carregar imagens do banco (formato não suportado).');
+      return;
+    }
+    setDatabaseImages(prev => [...prev, ...imageFiles]);
+    if (event.target) {
+      event.target.value = null;
+    }
   };
 
   // Carregar dados iniciais
   useEffect(() => {
     fetchClientes();
+  }, []);
+
+  useEffect(() => {
+    try {
+      const all = ApiKeyStore.all();
+      setApiKeys({
+        OPENAI: all.OPENAI,
+        ANTHROPIC: all.ANTHROPIC,
+        GOOGLE_VISION: all.GOOGLE_VISION,
+        OPENCAGE: all.OPENCAGE,
+        MAPBOX: all.MAPBOX,
+        GOOGLE_MAPS: all.GOOGLE_MAPS
+      });
+      setProvidersStatus({
+        openai: !!all.OPENAI,
+        anthropic: !!all.ANTHROPIC,
+        googleVision: !!all.GOOGLE_VISION,
+        geocode: !!(all.OPENCAGE || all.MAPBOX || all.GOOGLE_MAPS)
+      });
+    } catch (e) {
+      if (isDev) console.error('Erro ao carregar chaves de API locais:', e);
+    }
   }, []);
 
   // Carregar projetos quando cliente for selecionado
@@ -117,7 +168,7 @@ const AIImageAnalysis = () => {
       const data = await relationshipService.getUserCompleteData();
       setClientes(data.clientes || []);
     } catch (error) {
-      console.error('Erro ao carregar clientes:', error);
+      if (isDev) console.error('Erro ao carregar clientes:', error);
       setError('Erro ao carregar clientes');
     } finally {
       setLoadingData(false);
@@ -131,7 +182,7 @@ const AIImageAnalysis = () => {
       const projetosCliente = data.projetos.filter(p => p.cliente_id === clienteId);
       setProjetos(projetosCliente);
     } catch (error) {
-      console.error('Erro ao carregar projetos:', error);
+      if (isDev) console.error('Erro ao carregar projetos:', error);
       setError('Erro ao carregar projetos');
     } finally {
       setLoadingData(false);
@@ -144,7 +195,7 @@ const AIImageAnalysis = () => {
       const projectData = await relationshipService.getProjectWithRelations(projetoId);
       setOrcamentos(projectData.orcamentos || []);
     } catch (error) {
-      console.error('Erro ao carregar orçamentos:', error);
+      if (isDev) console.error('Erro ao carregar orçamentos:', error);
       setError('Erro ao carregar orçamentos');
     } finally {
       setLoadingData(false);
@@ -152,8 +203,22 @@ const AIImageAnalysis = () => {
   };
 
   const handleWebscrapingImageUpload = (event) => {
-    const files = Array.from(event.target.files);
-    setWebscrapingImages(prev => [...prev, ...files]);
+    const files = Array.from(event.target.files || []);
+    const allowedExt = ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif', '.heic', '.heif'];
+    const imageFiles = files.filter(file => {
+      const name = (file.name || '').toLowerCase();
+      const hasType = (file.type || '').startsWith('image/');
+      const hasExt = allowedExt.some(ext => name.endsWith(ext));
+      return hasType || hasExt;
+    });
+    if (!imageFiles.length) {
+      setError('Não foi possível carregar imagens de webscraping (formato não suportado).');
+      return;
+    }
+    setWebscrapingImages(prev => [...prev, ...imageFiles]);
+    if (event.target) {
+      event.target.value = null;
+    }
   };
 
   const removeDatabaseImage = (index) => {
@@ -288,7 +353,7 @@ const AIImageAnalysis = () => {
       }
     } catch (err) {
       setError('Erro inesperado durante a análise.');
-      console.error('Erro na análise:', err);
+      if (isDev) console.error('Erro na análise:', err);
     } finally {
       setLoading(false);
     }
@@ -395,11 +460,13 @@ const AIImageAnalysis = () => {
       }
     } catch (err) {
       setError(`Erro inesperado: ${err.message}`);
+      
     } finally {
       setLoading(false);
     }
   };
 
+  const isDev = import.meta.env.MODE !== 'production';
   const generateDetailedReport = () => {
     if (activeTab === 'analysis' && analysisResult) {
       const report = {
@@ -534,7 +601,7 @@ const AIImageAnalysis = () => {
         projeto_id: selectedProjeto,
         cliente_id: selectedProject?.cliente_id,
         metodologia_utilizada: 'Análise de Imagens com IA',
-        valor_final: selectedBudget?.valor || 0,
+        valor_final: selectedBudget?.valorEstimado || 0,
         observacoes: `Análise realizada com IA para o projeto "${selectedProject?.nome}" do cliente "${selectedClient?.nome}":\n\n${analysisResult.analysis}`,
         status: 'concluida',
         data_avaliacao: new Date().toISOString().split('T')[0],
@@ -565,7 +632,7 @@ const AIImageAnalysis = () => {
         throw new Error(response.data.message || 'Erro ao salvar avaliação');
       }
     } catch (error) {
-      console.error('Erro ao salvar avaliação:', error);
+      if (isDev) console.error('Erro ao salvar avaliação:', error);
       setError('Erro ao salvar análise como avaliação: ' + (error.response?.data?.message || error.message));
     } finally {
       setLoading(false);
@@ -798,6 +865,95 @@ const AIImageAnalysis = () => {
             🔍 Comparação de Imagens
           </button>
         </div>
+
+        <div style={{ ...styles.card, marginTop: '12px' }}>
+          <h3 style={styles.sectionTitle}>Configuração de APIs</h3>
+          <div style={styles.row}>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>OpenAI API Key</label>
+              <input type="password" value={apiKeys.OPENAI} onChange={(e)=>setApiKeys(prev=>({ ...prev, OPENAI: e.target.value }))} style={styles.input} placeholder="sk-..." />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Anthropic API Key</label>
+              <input type="password" value={apiKeys.ANTHROPIC} onChange={(e)=>setApiKeys(prev=>({ ...prev, ANTHROPIC: e.target.value }))} style={styles.input} placeholder="api_key" />
+            </div>
+          </div>
+          <div style={styles.row}>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Google Vision API Key</label>
+              <input type="password" value={apiKeys.GOOGLE_VISION} onChange={(e)=>setApiKeys(prev=>({ ...prev, GOOGLE_VISION: e.target.value }))} style={styles.input} placeholder="AIza..." />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>OpenCage API Key</label>
+              <input type="password" value={apiKeys.OPENCAGE} onChange={(e)=>setApiKeys(prev=>({ ...prev, OPENCAGE: e.target.value }))} style={styles.input} placeholder="opencage-key" />
+            </div>
+          </div>
+          <div style={styles.row}>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Mapbox Token</label>
+              <input type="password" value={apiKeys.MAPBOX} onChange={(e)=>setApiKeys(prev=>({ ...prev, MAPBOX: e.target.value }))} style={styles.input} placeholder="pk.ey..." />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Google Maps Geocoding Key</label>
+              <input type="password" value={apiKeys.GOOGLE_MAPS} onChange={(e)=>setApiKeys(prev=>({ ...prev, GOOGLE_MAPS: e.target.value }))} style={styles.input} placeholder="AIza..." />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+            <button
+              onClick={()=>{
+                ApiKeyStore.set('OPENAI', apiKeys.OPENAI);
+                ApiKeyStore.set('ANTHROPIC', apiKeys.ANTHROPIC);
+                ApiKeyStore.set('GOOGLE_VISION', apiKeys.GOOGLE_VISION);
+                ApiKeyStore.set('OPENCAGE', apiKeys.OPENCAGE);
+                ApiKeyStore.set('MAPBOX', apiKeys.MAPBOX);
+                ApiKeyStore.set('GOOGLE_MAPS', apiKeys.GOOGLE_MAPS);
+                setProvidersStatus({
+                  openai: !!apiKeys.OPENAI,
+                  anthropic: !!apiKeys.ANTHROPIC,
+                  googleVision: !!apiKeys.GOOGLE_VISION,
+                  geocode: !!(apiKeys.OPENCAGE || apiKeys.MAPBOX || apiKeys.GOOGLE_MAPS)
+                });
+                alert('Chaves salvas localmente. Reinicie a análise para aplicar.');
+              }}
+              style={{ ...styles.button, ...styles.primaryButton }}
+            >
+              Salvar Chaves
+            </button>
+            <button
+              onClick={async ()=>{
+                try {
+                  const adminToken = localStorage.getItem('geomind_admin_token') || '';
+                  await api.post(API_ENDPOINTS.integracoes.apis, {
+                    OPENAI: apiKeys.OPENAI,
+                    ANTHROPIC: apiKeys.ANTHROPIC,
+                    GOOGLE_VISION: apiKeys.GOOGLE_VISION,
+                    OPENCAGE: apiKeys.OPENCAGE,
+                    MAPBOX: apiKeys.MAPBOX,
+                    GOOGLE_MAPS: apiKeys.GOOGLE_MAPS
+                  }, { headers: { 'x-admin-token': adminToken } });
+                  const statusResp = await api.get(API_ENDPOINTS.integracoes.apis);
+                  const st = statusResp.data?.status || {};
+                  setProvidersStatus({
+                    openai: !!st.OPENAI,
+                    anthropic: !!st.ANTHROPIC,
+                    googleVision: !!st.GOOGLE_VISION,
+                    geocode: !!(st.OPENCAGE || st.MAPBOX || st.GOOGLE_MAPS)
+                  });
+                  alert('Chaves salvas no servidor com sucesso.');
+                } catch (e) {
+                  if (isDev) console.error('Erro ao salvar chaves no servidor:', e);
+                  alert('Erro ao salvar no servidor. Verifique o token admin.');
+                }
+              }}
+              style={{ ...styles.button, backgroundColor: '#0ea5e9', color: 'white' }}
+            >
+              Salvar no Servidor
+            </button>
+            <div style={{ alignSelf: 'center', fontSize: '12px', color: '#6b7280' }}>
+              OpenAI: {providersStatus.openai ? 'ok' : 'off'} | Anthropic: {providersStatus.anthropic ? 'ok' : 'off'} | Google Vision: {providersStatus.googleVision ? 'ok' : 'off'} | Geocoding: {providersStatus.geocode ? 'ok' : 'off'}
+            </div>
+          </div>
+        </div>
         
         {error && <div style={styles.error}>{error}</div>}
         
@@ -843,38 +999,63 @@ const AIImageAnalysis = () => {
             </div>
           </div>
           
-          <div style={styles.row}>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Tipo de Imóvel</label>
-              <select
-                value={propertyInfo.tipo}
-                onChange={(e) => handlePropertyInfoChange('tipo', e.target.value)}
-                style={styles.select}
-              >
-                <option value="">Selecione o tipo</option>
-                <option value="Casa">Casa</option>
-                <option value="Apartamento">Apartamento</option>
-                <option value="Terreno">Terreno</option>
-                <option value="Comercial">Comercial</option>
-                <option value="Industrial">Industrial</option>
-              </select>
-            </div>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Finalidade</label>
-              <select
-                value={propertyInfo.finalidade}
-                onChange={(e) => handlePropertyInfoChange('finalidade', e.target.value)}
-                style={styles.select}
-              >
-                <option value="">Selecione a finalidade</option>
-                <option value="Compra e Venda">Compra e Venda</option>
-                <option value="Financiamento">Financiamento</option>
-                <option value="Seguro">Seguro</option>
-                <option value="Locação">Locação</option>
-                <option value="Judicial">Judicial</option>
-              </select>
-            </div>
+        <div style={styles.row}>
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Tipo de Imóvel</label>
+            <select
+              value={propertyInfo.tipo}
+              onChange={(e) => handlePropertyInfoChange('tipo', e.target.value)}
+              style={styles.select}
+            >
+              <option value="">Selecione o tipo</option>
+              <option value="Casa">Casa</option>
+              <option value="Apartamento">Apartamento</option>
+              <option value="Terreno">Terreno</option>
+              <option value="Comercial">Comercial</option>
+              <option value="Industrial">Industrial</option>
+            </select>
           </div>
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Finalidade</label>
+            <select
+              value={propertyInfo.finalidade}
+              onChange={(e) => handlePropertyInfoChange('finalidade', e.target.value)}
+              style={styles.select}
+            >
+              <option value="">Selecione a finalidade</option>
+              <option value="Compra e Venda">Compra e Venda</option>
+              <option value="Financiamento">Financiamento</option>
+              <option value="Seguro">Seguro</option>
+              <option value="Locação">Locação</option>
+              <option value="Judicial">Judicial</option>
+            </select>
+          </div>
+        </div>
+
+        <div style={styles.row}>
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Latitude (manual)</label>
+            <input
+              type="number"
+              step="0.000001"
+              value={propertyInfo.coordsLat}
+              onChange={(e) => handlePropertyInfoChange('coordsLat', e.target.value)}
+              style={styles.input}
+              placeholder="Ex.: -30.123456"
+            />
+          </div>
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Longitude (manual)</label>
+            <input
+              type="number"
+              step="0.000001"
+              value={propertyInfo.coordsLng}
+              onChange={(e) => handlePropertyInfoChange('coordsLng', e.target.value)}
+              style={styles.input}
+              placeholder="Ex.: -51.123456"
+            />
+          </div>
+        </div>
           
           <div style={styles.row}>
             <div style={styles.formGroup}>
@@ -979,7 +1160,7 @@ const AIImageAnalysis = () => {
             <input
               type="file"
               multiple
-              accept="image/*"
+              accept="image/*,.heic,.heif"
               onChange={handleImageUpload}
               style={styles.fileInput}
             />
@@ -1013,6 +1194,13 @@ const AIImageAnalysis = () => {
                     >
                       ×
                     </button>
+                    <div style={{ marginBottom: '6px' }}>
+                      <img
+                        alt={image.name}
+                        src={SafariCompatibility.createObjectURL(image)}
+                        style={{ maxWidth: '100%', maxHeight: 100, objectFit: 'cover', borderRadius: 6, border: '1px solid #e5e7eb' }}
+                      />
+                    </div>
                     <div style={{ fontSize: '12px', color: '#6b7280', wordBreak: 'break-word' }}>
                       {image.name}
                     </div>
@@ -1115,7 +1303,7 @@ const AIImageAnalysis = () => {
                 <input
                   type="file"
                   multiple
-                  accept="image/*"
+                  accept="image/*,.heic,.heif"
                   onChange={handleDatabaseImageUpload}
                   style={styles.fileInput}
                 />
@@ -1144,6 +1332,13 @@ const AIImageAnalysis = () => {
                         >
                           ×
                         </button>
+                        <div style={{ marginBottom: '6px' }}>
+                          <img
+                            alt={image.name}
+                            src={SafariCompatibility.createObjectURL(image)}
+                            style={{ maxWidth: '100%', maxHeight: 100, objectFit: 'cover', borderRadius: 6, border: '1px solid #e5e7eb' }}
+                          />
+                        </div>
                         <div style={{ fontSize: '12px', color: '#6b7280', wordBreak: 'break-word' }}>
                           {image.name}
                         </div>
@@ -1165,7 +1360,7 @@ const AIImageAnalysis = () => {
                 <input
                   type="file"
                   multiple
-                  accept="image/*"
+                  accept="image/*,.heic,.heif"
                   onChange={handleWebscrapingImageUpload}
                   style={styles.fileInput}
                 />
@@ -1194,6 +1389,13 @@ const AIImageAnalysis = () => {
                         >
                           ×
                         </button>
+                        <div style={{ marginBottom: '6px' }}>
+                          <img
+                            alt={image.name}
+                            src={SafariCompatibility.createObjectURL(image)}
+                            style={{ maxWidth: '100%', maxHeight: 100, objectFit: 'cover', borderRadius: 6, border: '1px solid #e5e7eb' }}
+                          />
+                        </div>
                         <div style={{ fontSize: '12px', color: '#6b7280', wordBreak: 'break-word' }}>
                           {image.name}
                         </div>
@@ -1313,6 +1515,20 @@ const AIImageAnalysis = () => {
                   {analysisResult.locationData.coordinates && (
                     <div><strong>Coordenadas:</strong> {analysisResult.locationData.coordinates}</div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {analysisResult.amenities && (
+              <div style={{ marginTop: '20px', padding: '16px', backgroundColor: '#eef2ff', borderRadius: '8px' }}>
+                <h4 style={{ color: '#1f2937', marginBottom: '12px', fontSize: '16px' }}>🗺️ Comodidades no Entorno</h4>
+                <div style={{ fontSize: '14px', lineHeight: '1.6' }}>
+                  <div><strong>Total mapeado:</strong> {analysisResult.amenities.total}</div>
+                  <div style={{ marginTop: '8px' }}>
+                    {Object.entries(analysisResult.amenities.summary).slice(0,8).map(([k,v]) => (
+                      <span key={k} style={{ display: 'inline-block', marginRight: '8px', marginBottom: '6px', backgroundColor: '#e2e8f0', color: '#1f2937', padding: '4px 8px', borderRadius: '12px', fontSize: '12px' }}>{k}: {v}</span>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
