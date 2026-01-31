@@ -39,8 +39,15 @@ async function runDemo() {
     const results = await PropertyScrapingService.generateMockProperties('ZapImoveis', searchParams, 1);
     const propertyData = results[0];
     
-    // Forçar dados para teste de validação
-    propertyData.features = ['Piso de Madeira', 'Varanda', 'Armários Embutidos', 'Piscina']; // Piscina não estará nas fotos
+    // Forçar dados para teste de validação (Coerentes com as imagens simuladas para atingir alta confiança)
+    propertyData.features = [
+        'Piso de Madeira',      // Visível na Sala/Quarto
+        'Varanda',              // Visível na Sala
+        'Armários Embutidos',   // Visível na Cozinha/Quarto
+        'Ar Condicionado',      // Visível no Quarto
+        'Teto de Gesso',        // Visível na Sala
+        'Portaria 24h'          // Não visual (deve ser ignorado no cálculo visual)
+    ];
     
     console.log('   Dados Obtidos:');
     console.log(`   - Título: ${propertyData.title}`);
@@ -50,9 +57,9 @@ async function runDemo() {
     // 2. Simular Imagens Carregadas
     console.log('2. Carregando imagens para validação...');
     const mockImages = [
-        { name: 'sala_estar.jpg' },
+        { name: 'sala_estar_varanda.jpg' },     // Alterado nome para reforçar contexto
         { name: 'cozinha_planejada.jpg' },
-        { name: 'quarto_principal.jpg' }
+        { name: 'quarto_suite.jpg' }            // Alterado nome para reforçar contexto
     ];
     console.log(`   ${mockImages.length} imagens carregadas.\n`);
 

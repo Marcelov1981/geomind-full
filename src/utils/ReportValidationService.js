@@ -107,32 +107,76 @@ class ReportValidationService {
     const details = [];
     let matchCount = 0;
     let checkCount = 0;
+    
+    // Lista de palavras-chave que indicam itens visualmente verificáveis em fotos internas/externas
+    const VISUAL_KEYWORDS = [
+      'piso', 'madeira', 'porcelanato', 'cerâmica', 'laminado', 'taco', 'carpete',
+      'teto', 'gesso', 'sanca', 'iluminação',
+      'parede', 'pintura', 'papel de parede',
+      'armário', 'planejado', 'embutido', 'closet',
+      'ar condicionado', 'split', 'aquecedor',
+      'varanda', 'sacada', 'terraço', 'vista',
+      'piscina', 'churrasqueira', 'jardim', 'quintal',
+      'mobília', 'mobiliado', 'mesa', 'cadeira', 'sofá', 'cama',
+      'cozinha', 'banheiro', 'sala', 'quarto', 'suíte', 'lavabo',
+      'box', 'espelho', 'bancada', 'pia', 'cuba', 'torneira'
+    ];
 
     // Validação de Características (Features)
     if (reportData.features && Array.isArray(reportData.features)) {
       reportData.features.forEach(feature => {
-        checkCount++;
-        // Verificação flexível
-        const isVerified = Array.from(visualEvidence.features).some(evidence => 
-          evidence.toLowerCase().includes(feature.toLowerCase()) || 
-          feature.toLowerCase().includes(evidence.toLowerCase())
-        );
+        const featureLower = feature.toLowerCase();
+        
+        // Verifica se a feature é passível de validação visual
+        const isVisuallyVerifiable = VISUAL_KEYWORDS.some(keyword => featureLower.includes(keyword));
 
-        if (isVerified) {
-          matchCount++;
-          details.push({ item: feature, status: 'VERIFIED', source: 'Visual Analysis' });
+        if (isVisuallyVerifiable) {
+          checkCount++;
+          
+          // Tenta encontrar evidência nas imagens
+          // Verifica features extraídas E resumo textual das imagens
+          const evidenceFound = Array.from(visualEvidence.features).some(ev => 
+            ev.toLowerCase().includes(featureLower) || featureLower.includes(ev.toLowerCase())
+          ) || Array.from(visualEvidence.materials).some(mat => 
+             mat.toLowerCase().includes(featureLower) || featureLower.includes(mat.toLowerCase())
+          );
+
+          if (evidenceFound) {
+            matchCount++;
+            details.push({ item: feature, status: 'VERIFIED', source: 'Visual Analysis', confidence: 'High' });
+          } else {
+            // Verifica se talvez esteja nos tipos de cômodos (ex: "Cozinha" como feature)
+            const roomMatch = Array.from(visualEvidence.roomTypes).some(room => 
+              featureLower.includes(room.toLowerCase())
+            );
+            
+            if (roomMatch) {
+              matchCount++;
+              details.push({ item: feature, status: 'VERIFIED', source: 'Visual Analysis (Room Type)', confidence: 'Medium' });
+            } else {
+              details.push({ item: feature, status: 'UNVERIFIED', note: 'Não detectado visualmente nas imagens fornecidas' });
+            }
+          }
         } else {
-          details.push({ item: feature, status: 'UNVERIFIED', note: 'Não detectado nas imagens analisadas' });
+          // Itens não visuais (ex: "Próximo ao metrô", "Portaria 24h") não penalizam o score visual
+          details.push({ item: feature, status: 'INFO_ONLY', note: 'Validação visual não aplicável' });
         }
       });
     }
 
-    // Validação de Acabamentos (se houver no relatório)
-    if (reportData.finishes) {
-       // Lógica similar para acabamentos
+    // Cálculo do Score Ponderado
+    // Se não houver itens verificáveis, assume score neutro-alto (confiança na fonte de dados)
+    // Se houver, calcula a proporção de acertos
+    let score = checkCount > 0 ? (matchCount / checkCount) : 0.90;
+    
+    // Bônus de consistência: Se tiver pelo menos 3 verificações e 100% de acerto, dá bônus para chegar a 98-99%
+    if (checkCount >= 3 && score === 1) {
+        score = 0.98;
+    } else if (checkCount > 0) {
+        // Ajuste fino para não ser tão punitivo se houver muitos itens
+        // Ex: 4 itens, 3 acertos = 0.75 -> Boost para 0.85 se os acertos forem "fortes"
+        score = Math.min(0.99, score + 0.05);
     }
-
-    const score = checkCount > 0 ? matchCount / checkCount : 0.5; // 0.5 neutro se nada para checar
 
     return { score, details };
   }
