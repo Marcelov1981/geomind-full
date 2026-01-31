@@ -180,26 +180,36 @@ class PropertyScrapingService {
    */
   static generateMockProperties(portal, params, count) {
     const properties = [];
-    const { coordinates, propertyType, minPrice = 100000, maxPrice = 1000000 } = params;
+    const { 
+      coordinates, 
+      propertyType, 
+      minPrice = 100000, 
+      maxPrice = 1000000,
+      minArea = 50,
+      maxArea = 300,
+      bedrooms: targetBedrooms
+    } = params;
     
     for (let i = 0; i < count; i++) {
       const price = this.randomBetween(minPrice, maxPrice);
-      const area = this.randomBetween(50, 300);
-      const bedrooms = this.randomBetween(1, 4);
-      const bathrooms = this.randomBetween(1, 3);
+      const area = this.randomBetween(minArea, maxArea);
+      const bedrooms = targetBedrooms || this.randomBetween(1, 4);
+      const bathrooms = this.randomBetween(Math.ceil(bedrooms/2), bedrooms + 1);
       
       // Gera coordenadas próximas
       const lat = coordinates.lat + (Math.random() - 0.5) * 0.02;
       const lng = coordinates.lng + (Math.random() - 0.5) * 0.02;
+      const parkingSpaces = this.randomBetween(1, 3);
       
       properties.push({
         id: `${portal.toLowerCase()}_${Date.now()}_${i}`,
         title: `${propertyType} ${area}m² - ${bedrooms} quartos`,
-        description: `Excelente ${propertyType} com ${bedrooms} quartos e ${bathrooms} banheiros`,
+        description: `Excelente ${propertyType} com ${bedrooms} quartos, ${bathrooms} banheiros e ${parkingSpaces} vagas`,
         price: price,
         area: area,
         bedrooms: bedrooms,
         bathrooms: bathrooms,
+        parkingSpaces: parkingSpaces,
         propertyType: propertyType,
         coordinates: { lat, lng },
         address: `Rua Exemplo ${i + 1}, Bairro Teste`,
@@ -235,7 +245,8 @@ class PropertyScrapingService {
       'Piscina', 'Academia', 'Churrasqueira', 'Playground',
       'Portaria 24h', 'Elevador', 'Garagem', 'Varanda',
       'Ar Condicionado', 'Armários Embutidos', 'Quintal',
-      'Área de Serviço', 'Sacada', 'Vista para o Mar'
+      'Área de Serviço', 'Sacada', 'Vista para o Mar',
+      'Dependência de Empregada'
     ];
     
     const count = Math.floor(Math.random() * 6) + 2;
