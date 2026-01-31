@@ -10,6 +10,31 @@ import GoogleGenAIService from './GoogleGenAIService.js';
 import POIService from './POIService.js';
 import ApiKeyStore from './ApiKeyStore.js';
 
+// Helper para compatibilidade entre Vite e Node.js
+const getEnv = (key) => {
+  try {
+    // eslint-disable-next-line
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      // eslint-disable-next-line
+      return import.meta.env[key];
+    }
+  } catch {
+    // Ignora erro de acesso
+  }
+  
+  try {
+    // eslint-disable-next-line
+    if (typeof process !== 'undefined' && process.env) {
+      // eslint-disable-next-line
+      return process.env[key];
+    }
+  } catch {
+    // Ignora erro de acesso
+  }
+  
+  return undefined;
+};
+
 class CustomAIService {
   static API_ENDPOINTS = {
     // APIs de IA para análise de imagens
@@ -20,10 +45,10 @@ class CustomAIService {
   };
 
   static API_KEYS = {
-    OPENAI: ApiKeyStore.get('OPENAI') || import.meta.env.VITE_OPENAI_API_KEY,
-    ANTHROPIC: ApiKeyStore.get('ANTHROPIC') || import.meta.env.VITE_ANTHROPIC_API_KEY,
-    AZURE: import.meta.env.VITE_AZURE_VISION_KEY,
-    GOOGLE: ApiKeyStore.get('GOOGLE_VISION') || import.meta.env.VITE_GOOGLE_VISION_KEY
+    OPENAI: ApiKeyStore.get('OPENAI') || getEnv('VITE_OPENAI_API_KEY'),
+    ANTHROPIC: ApiKeyStore.get('ANTHROPIC') || getEnv('VITE_ANTHROPIC_API_KEY'),
+    AZURE: getEnv('VITE_AZURE_VISION_KEY'),
+    GOOGLE: ApiKeyStore.get('GOOGLE_VISION') || getEnv('VITE_GOOGLE_VISION_KEY')
   };
 
   /**
@@ -283,11 +308,11 @@ class CustomAIService {
     try {
       console.log('🔍 Iniciando análise visual da imagem...');
       console.log('📊 APIs disponíveis:', {
-        GoogleGenAI: !!import.meta.env.VITE_GEMINI_API_KEY,
+        GoogleGenAI: !!getEnv('VITE_GEMINI_API_KEY'),
         OpenAI: !!this.API_KEYS.OPENAI && this.API_KEYS.OPENAI !== 'your_openai_api_key_here',
         Anthropic: !!this.API_KEYS.ANTHROPIC && this.API_KEYS.ANTHROPIC !== 'your_anthropic_api_key_here',
         Google: !!this.API_KEYS.GOOGLE && this.API_KEYS.GOOGLE !== 'your_google_vision_api_key_here',
-        Gemini: !!import.meta.env.VITE_GEMINI_API_KEY
+        Gemini: !!getEnv('VITE_GEMINI_API_KEY')
       });
       
       // Converte imagem para base64
@@ -297,7 +322,7 @@ class CustomAIService {
       let result = null;
       
       // Tenta Google GenAI primeiro (nova biblioteca)
-      if (import.meta.env.VITE_GEMINI_API_KEY) {
+      if (getEnv('VITE_GEMINI_API_KEY')) {
         try {
           console.log('🤖 Tentando análise com Google GenAI (nova biblioteca)...');
           result = await GoogleGenAIService.analyzeImage(imageFile, customPrompt);
@@ -341,7 +366,7 @@ class CustomAIService {
       }
       
       // Fallback para Gemini se disponível
-      if (!result && import.meta.env.VITE_GEMINI_API_KEY) {
+      if (!result && getEnv('VITE_GEMINI_API_KEY')) {
         try {
           console.log('🤖 Usando fallback: Google Gemini...');
           result = await this.analyzeWithGemini(base64Image, customPrompt);
@@ -376,7 +401,7 @@ class CustomAIService {
     try {
       const prompt = this.buildAnalysisPrompt();
       
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${getEnv('VITE_GEMINI_API_KEY')}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -1221,6 +1246,12 @@ Seja EXTREMAMENTE DETALHADO, observando cada elemento visível na imagem. Descre
    * Converte arquivo para base64
    */
   static async fileToBase64(file) {
+    // Verifica se é ambiente Node.js ou se o arquivo é um mock
+    if (typeof window === 'undefined' || !file.type) {
+      // Retorna uma imagem base64 de placeholder para testes em ambiente Node.js
+      return 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    }
+
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {

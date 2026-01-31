@@ -5,11 +5,38 @@
 
 import ApiKeyStore from './ApiKeyStore.js'
 
+// Helper para compatibilidade entre Vite e Node.js
+const getEnv = (key) => {
+  // Verifica import.meta.env (Vite)
+  try {
+    // eslint-disable-next-line
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      // eslint-disable-next-line
+      return import.meta.env[key];
+    }
+  } catch {
+    // Ignora erro de acesso
+  }
+  
+  // Verifica process.env (Node.js)
+  try {
+    // eslint-disable-next-line
+    if (typeof process !== 'undefined' && process.env) {
+      // eslint-disable-next-line
+      return process.env[key];
+    }
+  } catch {
+    // Ignora erro de acesso
+  }
+  
+  return undefined;
+};
+
 class GeoLocationService {
   static API_KEYS = {
-    OPENCAGE: ApiKeyStore.get('OPENCAGE') || import.meta.env.VITE_OPENCAGE_API_KEY,
-    MAPBOX: ApiKeyStore.get('MAPBOX') || import.meta.env.VITE_MAPBOX_API_KEY,
-    GOOGLE: ApiKeyStore.get('GOOGLE_MAPS') || import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+    OPENCAGE: ApiKeyStore.get('OPENCAGE') || getEnv('VITE_OPENCAGE_API_KEY'),
+    MAPBOX: ApiKeyStore.get('MAPBOX') || getEnv('VITE_MAPBOX_API_KEY'),
+    GOOGLE: ApiKeyStore.get('GOOGLE_MAPS') || getEnv('VITE_GOOGLE_MAPS_API_KEY')
   };
 
   /**

@@ -230,6 +230,13 @@ class PropertyScrapingService {
           phone: `(11) 9${Math.floor(Math.random() * 10000)}-${Math.floor(Math.random() * 10000)}`,
           email: `contato${i}@${portal.toLowerCase()}.com`,
           agency: `Imobiliária ${portal} ${i + 1}`
+        },
+        source: {
+          name: portal,
+          url: `https://${portal.toLowerCase()}.com.br/imovel/${i}`,
+          retrievedAt: new Date().toISOString(),
+          method: 'Simulated Scraping',
+          reliability: 'High'
         }
       });
     }
