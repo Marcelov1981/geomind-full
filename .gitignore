@@ -34,3 +34,7 @@ backend/**/.env
 # Arquivos locais e dados potencialmente sensíveis
 *.xlsm
 *.xlsx
+/data/
+/storage/
+/decks/
+coverage/

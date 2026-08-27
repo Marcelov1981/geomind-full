@@ -3,7 +3,7 @@
  * Compara dados textuais do relatório com evidências visuais extraídas de imagens
  */
 
-import CustomAIService from './CustomAIService.js';
+import { analyzeImageOnServer } from '../services/aiAnalysisService';
 
 class ReportValidationService {
   /**
@@ -18,7 +18,7 @@ class ReportValidationService {
     
     try {
       // 1. Analisar todas as imagens para extrair características visuais
-      const visualEvidence = await this.extractVisualEvidence(imageFiles);
+      const visualEvidence = await this.extractVisualEvidence(imageFiles, reportData);
       
       // 2. Comparar evidências visuais com dados do relatório
       const validationResult = this.compareDataWithEvidence(reportData, visualEvidence);
@@ -44,9 +44,9 @@ class ReportValidationService {
   }
 
   /**
-   * Extrai evidências visuais das imagens usando CustomAIService
+   * Extrai evidências visuais das imagens usando o endpoint server-side
    */
-  static async extractVisualEvidence(imageFiles) {
+  static async extractVisualEvidence(imageFiles, reportData = {}) {
     const evidence = {
       features: new Set(),
       roomTypes: new Set(),
@@ -70,10 +70,16 @@ class ReportValidationService {
         Seja conciso e direto.
       `;
 
-      const analysis = await CustomAIService.performVisualAnalysis(image, validationPrompt);
+      const projectId = reportData.projectId || reportData.project_id || reportData.projetoId || reportData.projeto_id;
+      if (!projectId) throw new Error('A validação visual exige um projeto persistido.');
+      const analysis = await analyzeImageOnServer(image, {
+        projectId,
+        evaluationId: reportData.evaluationId || reportData.evaluation_id || reportData.avaliacaoId || reportData.avaliacao_id,
+        prompt: validationPrompt,
+      });
       
-      if (analysis && analysis.analysis) {
-        // Processamento simples do texto retornado (em produção usaria NLP mais robusto ou JSON mode)
+      if (analysis?.success && analysis.analysis) {
+        // A resposta estruturada vem do servidor; a heurística abaixo mantém compatibilidade com o relatório legado.
         const text = analysis.analysis.toLowerCase();
         
         // Extração heurística simples baseada em palavras-chave

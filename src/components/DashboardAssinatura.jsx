@@ -12,16 +12,8 @@ import {
   TrophyOutlined,
   WarningOutlined
 } from '@ant-design/icons';
-import { 
-  obterInfoPlano, 
-  verificarLimite, 
-  FUNCIONALIDADES, 
-  LIMITES_PLANO,
-  PLANOS,
-  PRECOS_PLANO
-} from '../utils/AccessControl';
+import { FUNCIONALIDADES, PLANOS } from '../utils/AccessControl';
 import paymentSystem from '../utils/PaymentSystem';
-import { PlanBadge, UsageLimitInfo } from './ProtectedComponent';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -34,27 +26,27 @@ const DashboardAssinatura = ({ onNavigate }) => {
 
   const carregarDados = useCallback(async () => {
     try {
-      // Carregar informações do plano
-      const info = obterInfoPlano();
+      const stats = await paymentSystem.atualizarDados();
+      const normalizedStats = {
+        ...stats,
+        consultasMesAtual: Number(stats?.monthly_used || 0),
+        gastoMesAtual: 0,
+        totalGasto: 0,
+        consultasRealizadas: Number(stats?.monthly_used || 0),
+        creditosDisponiveis: Number(stats?.balance_cents || 0),
+      };
+      const info = {
+        plano: stats?.plan || 'trial',
+        nome: stats?.plan === 'trial' ? 'Período de avaliação' : `Plano ${stats?.plan || 'atual'}`,
+        preco: null,
+        permissoes: [FUNCIONALIDADES.ANALISE_IMAGEM, FUNCIONALIDADES.RELATORIO_PDF, FUNCIONALIDADES.HISTORICO_CONSULTAS],
+        dataVencimento: null,
+        ativo: true,
+      };
       setInfoPlano(info);
-
-      // Carregar estatísticas de pagamento
-      const stats = paymentSystem.obterEstatisticas();
-      setEstatisticas(stats);
-
-      // Verificar limites de uso
-      const limitesVerificados = {};
-      const limitesPlano = LIMITES_PLANO[info.plano] || {};
-      
-      Object.keys(limitesPlano).forEach(tipoLimite => {
-        if (limitesPlano[tipoLimite] !== null) {
-          limitesVerificados[tipoLimite] = verificarLimite(tipoLimite);
-        }
-      });
-      setLimites(limitesVerificados);
-
-      // Gerar alertas
-      gerarAlertas(info, limitesVerificados, stats);
+      setEstatisticas(normalizedStats);
+      setLimites({ consultasMensais: { limite: null, usado: normalizedStats.consultasMesAtual } });
+      gerarAlertas(info, {}, normalizedStats);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     } finally {
@@ -106,7 +98,7 @@ const DashboardAssinatura = ({ onNavigate }) => {
     });
 
     // Verificar créditos baixos para consultas avulsas
-    if (info.plano === PLANOS.CONSULTA_AVULSA && stats?.creditosDisponiveis < PRECOS_PLANO[PLANOS.CONSULTA_AVULSA]) {
+    if (info.plano === PLANOS.CONSULTA_AVULSA && stats?.creditosDisponiveis < 100) {
       novosAlertas.push({
         tipo: 'warning',
         titulo: 'Créditos insuficientes',
@@ -165,7 +157,7 @@ const DashboardAssinatura = ({ onNavigate }) => {
       <div style={{ marginBottom: '24px' }}>
         <Space align="center" style={{ marginBottom: '16px' }}>
           <Title level={2} style={{ margin: 0 }}>Dashboard de Assinatura</Title>
-          <PlanBadge size="large" showPrice />
+          <Tag color="blue">{infoPlano.nome}</Tag>
         </Space>
         <Text type="secondary">Gerencie sua assinatura e acompanhe seu uso</Text>
       </div>
@@ -206,7 +198,7 @@ const DashboardAssinatura = ({ onNavigate }) => {
               <div>
                 <Text strong style={{ fontSize: '18px' }}>{infoPlano.nome}</Text>
                 <br />
-                <Text type="secondary">{formatarMoeda(infoPlano.preco)}{infoPlano.plano !== PLANOS.CONSULTA_AVULSA ? '/mês' : '/consulta'}</Text>
+                <Text type="secondary">{infoPlano.preco == null ? 'Preço e limites definidos pelo servidor' : `${formatarMoeda(infoPlano.preco)}${infoPlano.plano !== PLANOS.CONSULTA_AVULSA ? '/mês' : '/consulta'}`}</Text>
               </div>
               
               {infoPlano.dataVencimento && (
@@ -253,7 +245,7 @@ const DashboardAssinatura = ({ onNavigate }) => {
                     <Statistic
                       title="Consultas"
                       value={estatisticas.consultasMesAtual}
-                      suffix={`/ ${LIMITES_PLANO[infoPlano.plano]?.consultasMensais || '∞'}`}
+                      suffix=" / servidor"
                     />
                   </Col>
                   <Col span={12}>
@@ -324,9 +316,9 @@ const DashboardAssinatura = ({ onNavigate }) => {
                 <div style={{ textAlign: 'center', padding: '20px' }}>
                   <TrophyOutlined style={{ fontSize: '32px', color: '#52c41a', marginBottom: '8px' }} />
                   <br />
-                  <Text strong>Uso Ilimitado!</Text>
+                  <Text strong>Uso controlado pelo servidor</Text>
                   <br />
-                  <Text type="secondary">Seu plano não possui limites de uso</Text>
+                  <Text type="secondary">Os limites comerciais são aplicados no backend.</Text>
                 </div>
               )}
             </Space>

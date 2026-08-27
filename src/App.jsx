@@ -2,6 +2,9 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import CustomHeader from './components/CustomHeader';
 import { ProjectProvider } from './contexts/ProjectContext';
 import { appStyles, getSidebarStyles, otherStyles } from './styles/appStyles';
+import Login from './components/Login';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import api, { API_ENDPOINTS } from './config/api';
 
 const Clientes = lazy(() => import('./components/Cliente'));
 const Orcamentos = lazy(() => import('./components/Orcamentos'));
@@ -43,6 +46,8 @@ const SaaSApp = () => {
   const [tipoEdicaoConfiguracao, setTipoEdicaoConfiguracao] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [dadosNavegacao, setDadosNavegacao] = useState({});
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
 
   // Reset global styles
   useEffect(() => {
@@ -56,6 +61,17 @@ const SaaSApp = () => {
       document.body.style.overflow = 'auto';
     };
   }, []);
+
+  useEffect(() => {
+    if (activeSection !== 'dashboard') return undefined;
+    let cancelled = false;
+    setDashboardLoading(true);
+    api.get(API_ENDPOINTS.dashboard)
+      .then(({ data }) => { if (!cancelled) setDashboardStats(data); })
+      .catch(() => { if (!cancelled) setDashboardStats(null); })
+      .finally(() => { if (!cancelled) setDashboardLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeSection]);
 
   // Combina estilos estáticos com estilos dinâmicos
   const sidebarStyles = useMemo(() => getSidebarStyles(sidebarOpen), [sidebarOpen]);
@@ -189,14 +205,14 @@ const SaaSApp = () => {
               
               <div style={styles.dashboardGrid}>
                 {[
-                  { title: 'Clientes', value: '124', color: '#10b981', icon: 'user', section: 'cliente' },
-                  { title: 'Projetos', value: '43', color: '#0d9488', icon: 'folder', section: 'projeto' },
-                  { title: 'Orçamentos', value: '28', color: '#0891b2', icon: 'calculator', section: 'orcamento' },
-                  { title: 'Avaliação', value: '15', color: '#8b5cf6', icon: 'star', section: 'avaliacao' },
-                  { title: 'Laudos', value: '17', color: '#3b82f6', icon: 'file', section: 'laudo' }
-                ].map((card, index) => (
+                  { title: 'Clientes', key: 'clients', color: '#10b981', icon: 'user', section: 'cliente' },
+                  { title: 'Projetos', key: 'projects', color: '#0d9488', icon: 'folder', section: 'projeto' },
+                  { title: 'Orçamentos', key: 'budgets', color: '#0891b2', icon: 'calculator', section: 'orcamento' },
+                  { title: 'Avaliações', key: 'evaluations', color: '#8b5cf6', icon: 'star', section: 'avaliacao' },
+                  { title: 'Laudos', key: 'reports', color: '#3b82f6', icon: 'file', section: 'laudo' }
+                ].map((card) => ({ ...card, value: dashboardLoading ? '…' : String(dashboardStats?.[card.key] ?? 0) })).map((card) => (
                   <div 
-                    key={index} 
+                    key={card.key}
                     style={{
                       ...styles.card,
                       cursor: 'pointer'
@@ -665,4 +681,27 @@ const SaaSApp = () => {
   );
 };
 
-export default SaaSApp;
+const AuthGate = () => {
+  const { loading, user } = useAuth();
+  const [registerMode, setRegisterMode] = useState(false);
+
+  if (loading) {
+    return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', color: '#64748b' }}>Validando sessão…</div>;
+  }
+
+  if (!user) {
+    return registerMode
+      ? <CadastroUsuario onRegistered={() => setRegisterMode(false)} />
+      : <Login onCreateAccount={() => setRegisterMode(true)} />;
+  }
+
+  return <SaaSApp />;
+};
+
+const App = () => (
+  <AuthProvider>
+    <AuthGate />
+  </AuthProvider>
+);
+
+export default App;

@@ -1,9 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { Upload, Image, MapPin, Calendar, Camera, TrendingUp, Home, AlertCircle, CheckCircle, Loader } from 'lucide-react';
-import CustomAIService from '../utils/CustomAIService.js';
 import ExifService from '../utils/ExifService.js';
-import GeoLocationService from '../utils/GeoLocationService.js';
 import PropertyScrapingService from '../utils/PropertyScrapingService.js';
+import { analyzeImageOnServer } from '../services/aiAnalysisService';
 
 const AIImageAnalysisV2 = () => {
   const [selectedImages, setSelectedImages] = useState([]);
@@ -12,7 +11,8 @@ const AIImageAnalysisV2 = () => {
   const [currentStep, setCurrentStep] = useState('');
   const [error, setError] = useState('');
   const [config, setConfig] = useState({
-    aiProvider: 'openai',
+    aiProvider: 'google-gemini',
+    projectId: '',
     includeMarketAnalysis: true,
     searchRadius: 2000,
     maxSimilarProperties: 10
@@ -53,16 +53,11 @@ const AIImageAnalysisV2 = () => {
         const image = selectedImages[i];
         setCurrentStep(`Analisando imagem ${i + 1} de ${selectedImages.length}: ${image.name}`);
         
-        // Análise completa da imagem
-        const result = await CustomAIService.analyzeImageWithLocation(
-          image,
-          'Análise detalhada para avaliação imobiliária',
-          {
-            includeMarketAnalysis: config.includeMarketAnalysis,
-            searchRadius: config.searchRadius,
-            maxResults: config.maxSimilarProperties
-          }
-        );
+        // A chave Gemini permanece no backend; a tela envia apenas a evidência.
+        const result = await analyzeImageOnServer(image, {
+          projectId: config.projectId,
+          prompt: `Análise detalhada para avaliação imobiliária. Considere apenas elementos observáveis. Raio de busca solicitado: ${config.searchRadius}m. Não estime valor e não conclua segurança estrutural.`,
+        });
         
         results.push({
           fileName: image.name,
@@ -214,17 +209,17 @@ const AIImageAnalysisV2 = () => {
           <h3 className="text-lg font-semibold mb-4">Configurações</h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Provedor de IA</label>
-              <select 
-                value={config.aiProvider}
-                onChange={(e) => setConfig(prev => ({...prev, aiProvider: e.target.value}))}
+              <label className="block text-sm font-medium mb-1">ID do projeto</label>
+              <input
+                type="number"
+                min="1"
+                required
+                value={config.projectId}
+                onChange={(e) => setConfig(prev => ({ ...prev, projectId: e.target.value }))}
                 className="w-full p-2 border rounded-md"
-              >
-                <option value="openai">OpenAI GPT-4 Vision</option>
-                <option value="claude">Anthropic Claude</option>
-                <option value="google">Google Vision</option>
-                <option value="azure">Azure Vision</option>
-              </select>
+                placeholder="Ex.: 123"
+              />
+              <span className="text-xs text-gray-500">A imagem será vinculada ao projeto informado.</span>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Raio de Busca (m)</label>

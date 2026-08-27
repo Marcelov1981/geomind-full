@@ -19,10 +19,15 @@ const GerenciamentoCreditos = () => {
     carregarDados();
   }, []);
 
-  const carregarDados = () => {
-    setCreditos(paymentSystem.creditos);
-    setEstatisticas(paymentSystem.obterEstatisticas());
-    setHistorico(paymentSystem.obterHistoricoTransacoes());
+  const carregarDados = async () => {
+    try {
+      await paymentSystem.atualizarDados();
+      setCreditos(paymentSystem.creditos);
+      setEstatisticas(paymentSystem.obterEstatisticas());
+      setHistorico(paymentSystem.obterHistoricoTransacoes());
+    } catch (error) {
+      message.error(error.response?.data?.error || 'Não foi possível carregar o saldo de créditos.');
+    }
   };
 
   const handleAdicionarCreditos = async () => {
@@ -41,7 +46,7 @@ const GerenciamentoCreditos = () => {
       if (resultado.sucesso) {
         message.success(resultado.mensagem);
         setCreditos(resultado.novoSaldo);
-        carregarDados();
+        await carregarDados();
         setModalVisible(false);
       } else {
         message.error(resultado.mensagem);
@@ -54,6 +59,7 @@ const GerenciamentoCreditos = () => {
   };
 
   const handleConsultaAvulsa = async () => {
+    await paymentSystem.atualizarDados();
     const verificacao = paymentSystem.podeRealizarConsulta();
     
     if (!verificacao.pode) {
@@ -79,7 +85,7 @@ const GerenciamentoCreditos = () => {
 
       if (resultado.sucesso) {
         message.success('Consulta processada com sucesso!');
-        carregarDados();
+        await carregarDados();
         // Aqui você redirecionaria para a página de análise
         console.log('Redirecionando para análise...');
       } else {

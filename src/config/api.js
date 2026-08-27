@@ -1,107 +1,78 @@
 import axios from 'axios';
 
-const API_BASE_URL_DEV = 'http://localhost:3001';
-const normalizeBaseUrl = (value = '') => value.trim().replace(/\/+$/, '');
-const API_BASE_URL_PROD = normalizeBaseUrl(import.meta.env.VITE_API_BASE_URL);
-
-const DEV_CONFIG = {
-  baseURL: API_BASE_URL_DEV,
-  timeout: 30000,
-};
-
-const PROD_CONFIG = {
-  baseURL: API_BASE_URL_PROD,
-  timeout: 30000,
-};
-
-const config = (import.meta.env.PROD || import.meta.env.VITE_API_BASE_URL) ? PROD_CONFIG : DEV_CONFIG;
-const API_BASE_URL = config.baseURL;
-
-export const API_BASE_URL_EXPORT = config.baseURL;
-export { API_BASE_URL_EXPORT as API_BASE_URL };
+const configuredBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '');
+const defaultBaseUrl = import.meta.env.PROD ? '' : 'http://localhost:3001';
+export const API_BASE_URL = configuredBaseUrl.replace(/\/api\/v1$/i, '') || defaultBaseUrl;
+export const API_PREFIX = `${API_BASE_URL}/api/v1`;
 
 export const API_ENDPOINTS = {
-  // Configurações
   configuracoes: {
-    base: `${API_BASE_URL}/api/v1/configuracoes`,
-    geral: `${API_BASE_URL}/api/v1/configuracoes/geral`,
-    logo: `${API_BASE_URL}/api/v1/configuracoes/logo`,
-    byType: (tipo) => `${API_BASE_URL}/api/v1/configuracoes/${tipo}`,
+    base: `${API_PREFIX}/configuracoes`,
+    geral: `${API_PREFIX}/configuracoes/geral`,
+    logo: `${API_PREFIX}/configuracoes/logo`,
+    byType: (tipo) => `${API_PREFIX}/configuracoes/${encodeURIComponent(tipo)}`,
   },
-
-  // Usuários
   usuarios: {
-    base: `${API_BASE_URL}/api/v1/usuarios`,
-    register: `${API_BASE_URL}/api/v1/usuarios/register`,
-    login: `${API_BASE_URL}/api/v1/usuarios/login`,
-    profile: `${API_BASE_URL}/api/v1/usuarios/perfil`,
-    updatePassword: `${API_BASE_URL}/api/v1/usuarios/senha`,
-    primeiroLogin: `${API_BASE_URL}/api/v1/usuarios/primeiro-login`,
-    colaborador: `${API_BASE_URL}/api/v1/usuarios/colaborador`,
-    colaboradores: `${API_BASE_URL}/api/v1/usuarios/colaboradores`,
+    base: `${API_PREFIX}/usuarios`,
+    register: `${API_PREFIX}/usuarios/register`,
+    login: `${API_PREFIX}/usuarios/login`,
+    logout: `${API_PREFIX}/usuarios/logout`,
+    profile: `${API_PREFIX}/usuarios/perfil`,
+    updateProfile: `${API_PREFIX}/usuarios/perfil`,
+    updatePassword: `${API_PREFIX}/usuarios/senha`,
+    primeiroLogin: `${API_PREFIX}/usuarios/primeiro-login`,
+    colaborador: `${API_PREFIX}/usuarios/colaborador`,
+    colaboradores: `${API_PREFIX}/usuarios/colaboradores`,
   },
-  
-  // Backup
   backup: {
-    base: `${API_BASE_URL}/api/v1/backup`,
-    create: `${API_BASE_URL}/api/v1/backup`,
-    list: `${API_BASE_URL}/api/v1/backup`,
-    restore: (id) => `${API_BASE_URL}/api/v1/backup/${id}/restore`,
-    delete: (id) => `${API_BASE_URL}/api/v1/backup/${id}`,
-    autoConfig: `${API_BASE_URL}/api/v1/backup/auto-config`,
-    cleanup: `${API_BASE_URL}/api/v1/backup/cleanup`,
+    base: `${API_PREFIX}/backup`,
+    create: `${API_PREFIX}/backup`,
+    list: `${API_PREFIX}/backup`,
+    restore: (id) => `${API_PREFIX}/backup/${encodeURIComponent(id)}/restore`,
+    delete: (id) => `${API_PREFIX}/backup/${encodeURIComponent(id)}`,
+    download: (id) => `${API_PREFIX}/backup/${encodeURIComponent(id)}/download`,
+    cleanup: `${API_PREFIX}/backup/cleanup`,
   },
-  
-  // Integrações
   integracoes: {
-    base: `${API_BASE_URL}/api/v1/integracoes`,
-    apis: `${API_BASE_URL}/api/v1/integracoes/apis`,
-    webhooks: `${API_BASE_URL}/api/v1/integracoes/webhooks`,
-    test: `${API_BASE_URL}/api/v1/integracoes/test`,
-    logs: `${API_BASE_URL}/api/v1/integracoes/logs`,
+    base: `${API_PREFIX}/integracoes`,
+    webhooks: `${API_PREFIX}/integracoes/webhooks`,
+    status: `${API_PREFIX}/integracoes/status`,
   },
-  
-  // Orçamentos
-  orcamentos: {
-    base: `${API_BASE_URL}/api/v1/orcamentos`,
-    byId: (id) => `${API_BASE_URL}/api/v1/orcamentos/${id}`,
+  dashboard: `${API_PREFIX}/dashboard`,
+  orcamentos: { base: `${API_PREFIX}/orcamentos`, byId: (id) => `${API_PREFIX}/orcamentos/${encodeURIComponent(id)}` },
+  laudos: { base: `${API_PREFIX}/laudos`, byId: (id) => `${API_PREFIX}/laudos/${encodeURIComponent(id)}` },
+  avaliacoes: { base: `${API_PREFIX}/avaliacoes`, byId: (id) => `${API_PREFIX}/avaliacoes/${encodeURIComponent(id)}` },
+  clientes: { base: `${API_PREFIX}/clientes`, byId: (id) => `${API_PREFIX}/clientes/${encodeURIComponent(id)}` },
+  projetos: { base: `${API_PREFIX}/projetos`, byId: (id) => `${API_PREFIX}/projetos/${encodeURIComponent(id)}`, geo: (id) => `${API_PREFIX}/projetos/${encodeURIComponent(id)}/geografia`, importLaudo: (id) => `${API_PREFIX}/projetos/${encodeURIComponent(id)}/importacoes/laudo`, routes: (id) => `${API_PREFIX}/projetos/${encodeURIComponent(id)}/rotas`, evidences: (id) => `${API_PREFIX}/projetos/${encodeURIComponent(id)}/evidencias` },
+  evidencias: { byId: (id) => `${API_PREFIX}/evidencias/${encodeURIComponent(id)}`, download: (id) => `${API_PREFIX}/evidencias/${encodeURIComponent(id)}/download`, ai: (id) => `${API_PREFIX}/evidencias/${encodeURIComponent(id)}/analise-ia`, analyses: (id) => `${API_PREFIX}/evidencias/${encodeURIComponent(id)}/analises-ia`, review: (evidenceId, analysisId) => `${API_PREFIX}/evidencias/${encodeURIComponent(evidenceId)}/analises-ia/${encodeURIComponent(analysisId)}` },
+  billing: {
+    summary: `${API_PREFIX}/billing/summary`,
+    topUp: `${API_PREFIX}/billing/top-up`,
+    consume: `${API_PREFIX}/billing/consume`,
+    transactions: `${API_PREFIX}/billing/transactions`,
+    methods: `${API_PREFIX}/billing/payment-methods`,
   },
-  
-  // Laudos
-  laudos: {
-    base: `${API_BASE_URL}/api/v1/laudos`,
-    byId: (id) => `${API_BASE_URL}/api/v1/laudos/${id}`,
-  },
-  
-  // Avaliações
-  avaliacoes: {
-    base: `${API_BASE_URL}/api/v1/avaliacoes`,
-    byId: (id) => `${API_BASE_URL}/api/v1/avaliacoes/${id}`,
-  },
-  
-  // Clientes
-  clientes: {
-    base: `${API_BASE_URL}/api/v1/clientes`,
-    byId: (id) => `${API_BASE_URL}/api/v1/clientes/${id}`,
-  },
-  
-  // Projetos
-  projetos: {
-    base: `${API_BASE_URL}/api/v1/projetos`,
-    byId: (id) => `${API_BASE_URL}/api/v1/projetos/${id}`,
-  },
-  
-  // Health check
+  auditoria: `${API_PREFIX}/auditoria`,
   health: `${API_BASE_URL}/health`,
 };
 
 export const API_CONFIG = {
-  baseURL: API_BASE_URL,
+  baseURL: '',
   timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  withCredentials: true,
+  headers: { 'Content-Type': 'application/json' },
 };
 
 const api = axios.create(API_CONFIG);
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('geomind:session-expired'));
+    }
+    return Promise.reject(error);
+  },
+);
+
 export default api;

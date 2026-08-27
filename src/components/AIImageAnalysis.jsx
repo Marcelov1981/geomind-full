@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import CustomAIService from '../utils/CustomAIService';
 import api, { API_ENDPOINTS } from '../config/api';
-import ApiKeyStore from '../utils/ApiKeyStore.js';
 import PDFGenerator from '../utils/PDFGenerator';
 import SafariNotification from './SafariNotification.jsx';
 import SafariCompatibility from '../utils/SafariCompatibility.js';
 import LaudoPDF from './LaudoPDF';
 import relationshipService from '../services/relationshipService';
+import { analyzeImageOnServer, analyzeImagesOnServer } from '../services/aiAnalysisService';
 
 const isDev = import.meta.env.MODE !== 'production';
 
@@ -27,8 +26,7 @@ const AIImageAnalysis = () => {
   const [showReportModal, setShowReportModal] = useState(false);
   const [editableReport, setEditableReport] = useState(null);
   const [isEditingReport, setIsEditingReport] = useState(false);
-  const [apiKeys, setApiKeys] = useState({ OPENAI: '', ANTHROPIC: '', GOOGLE_VISION: '', OPENCAGE: '', MAPBOX: '', GOOGLE_MAPS: '' });
-  const [providersStatus, setProvidersStatus] = useState({ openai: false, anthropic: false, googleVision: false, geocode: false });
+  const [integrationStatus, setIntegrationStatus] = useState({ gemini: { configured: false }, maps: { configured: false }, local_gateway: { configured: false }, billing: { configured: false } });
   
   // Estados para dados de projeto
   const [clientes, setClientes] = useState([]);
@@ -145,27 +143,18 @@ const AIImageAnalysis = () => {
     fetchClientes();
   }, [fetchClientes]);
 
-  useEffect(() => {
+  const loadIntegrationStatus = useCallback(async () => {
     try {
-      const all = ApiKeyStore.all();
-      setApiKeys({
-        OPENAI: all.OPENAI,
-        ANTHROPIC: all.ANTHROPIC,
-        GOOGLE_VISION: all.GOOGLE_VISION,
-        OPENCAGE: all.OPENCAGE,
-        MAPBOX: all.MAPBOX,
-        GOOGLE_MAPS: all.GOOGLE_MAPS
-      });
-      setProvidersStatus({
-        openai: !!all.OPENAI,
-        anthropic: !!all.ANTHROPIC,
-        googleVision: !!all.GOOGLE_VISION,
-        geocode: !!(all.OPENCAGE || all.MAPBOX || all.GOOGLE_MAPS)
-      });
+      const response = await api.get(API_ENDPOINTS.integracoes.status);
+      setIntegrationStatus(response.data || {});
     } catch (e) {
-      if (isDev) console.error('Erro ao carregar chaves de API locais:', e);
+      if (isDev) console.error('Erro ao carregar status das integrações:', e);
     }
   }, []);
+
+  useEffect(() => {
+    loadIntegrationStatus();
+  }, [loadIntegrationStatus]);
 
   // Carregar projetos quando cliente for selecionado
   useEffect(() => {
@@ -277,9 +266,9 @@ const AIImageAnalysis = () => {
 
     try {
       // Enriquecer propertyInfo com dados do projeto selecionado
-      const selectedProject = projetos.find(p => p.id === selectedProjeto);
-      const selectedClient = clientes.find(c => c.id === selectedCliente);
-      const selectedBudget = orcamentos.find(o => o.id === selectedOrcamento);
+      const selectedProject = projetos.find(p => String(p.id) === String(selectedProjeto));
+      const selectedClient = clientes.find(c => String(c.id) === String(selectedCliente));
+      const selectedBudget = orcamentos.find(o => String(o.id) === String(selectedOrcamento));
       
       const enrichedPropertyInfo = {
         ...propertyInfo,
@@ -312,18 +301,19 @@ const AIImageAnalysis = () => {
 
 
       let result;
+      const serverOptions = { projectId: selectedProject?.id || enrichedPropertyInfo.projectId, evaluationId: selectedOrcamento || undefined, prompt: customPrompt };
       
       if (analysisType === 'single' && images.length > 0) {
-        result = await CustomAIService.analyzeImageWithLocation(images[0], customPrompt, enrichedPropertyInfo);
+        result = await analyzeImageOnServer(images[0], serverOptions);
       } else if (analysisType === 'multiple') {
-        result = await CustomAIService.analyzeMultipleImages(images, customPrompt, enrichedPropertyInfo);
+        result = await analyzeImagesOnServer(images, serverOptions);
       } else if (analysisType === 'comparison' && images.length >= 2) {
         const midPoint = Math.ceil(images.length / 2);
         const images1 = images.slice(0, midPoint);
         const images2 = images.slice(midPoint);
         // Para comparação, analisamos ambos os grupos e comparamos os resultados
-        const result1 = await CustomAIService.analyzeMultipleImages(images1, customPrompt, enrichedPropertyInfo);
-        const result2 = await CustomAIService.analyzeMultipleImages(images2, customPrompt, enrichedPropertyInfo);
+        const result1 = await analyzeImagesOnServer(images1, { projectId: selectedProject?.id || enrichedPropertyInfo.projectId, prompt: customPrompt });
+        const result2 = await analyzeImagesOnServer(images2, { projectId: selectedProject?.id || enrichedPropertyInfo.projectId, prompt: customPrompt });
         result = {
           success: true,
           analysis: `COMPARAÇÃO ENTRE GRUPOS DE IMAGENS:\n\nGRUPO 1:\n${result1.analysis}\n\nGRUPO 2:\n${result2.analysis}\n\nCOMPARAÇÃO:\nAmbos os grupos foram analisados com a nova IA avançada incluindo metadados EXIF, geolocalização e análise de mercado.`,
@@ -374,9 +364,9 @@ const AIImageAnalysis = () => {
 
     try {
       // Enriquecer propertyInfo com dados do projeto selecionado
-      const selectedProject = projetos.find(p => p.id === selectedProjeto);
-      const selectedClient = clientes.find(c => c.id === selectedCliente);
-      const selectedBudget = orcamentos.find(o => o.id === selectedOrcamento);
+      const selectedProject = projetos.find(p => String(p.id) === String(selectedProjeto));
+      const selectedClient = clientes.find(c => String(c.id) === String(selectedCliente));
+      const selectedBudget = orcamentos.find(o => String(o.id) === String(selectedOrcamento));
       
       const enrichedPropertyInfo = {
         ...propertyInfo,
@@ -435,9 +425,9 @@ const AIImageAnalysis = () => {
         - Próximos passos recomendados
       `;
 
-      // Análise comparativa usando CustomAIService
-      const result1 = await CustomAIService.analyzeMultipleImages(databaseImages, prompt, enrichedPropertyInfo);
-      const result2 = await CustomAIService.analyzeMultipleImages(webscrapingImages, prompt, enrichedPropertyInfo);
+      // A comparação usa exclusivamente o serviço de análise server-side.
+      const result1 = await analyzeImagesOnServer(databaseImages, { projectId: selectedProject?.id || enrichedPropertyInfo.projectId, prompt });
+      const result2 = await analyzeImagesOnServer(webscrapingImages, { projectId: selectedProject?.id || enrichedPropertyInfo.projectId, prompt });
       
       const result = {
         success: true,
@@ -595,8 +585,8 @@ const AIImageAnalysis = () => {
 
     try {
        setLoading(true);
-       const selectedBudget = orcamentos.find(o => o.id === selectedOrcamento);
-       const selectedProject = projetos.find(p => p.id === selectedProjeto);
+       const selectedBudget = orcamentos.find(o => String(o.id) === String(selectedOrcamento));
+       const selectedProject = projetos.find(p => String(p.id) === String(selectedProjeto));
        const selectedClient = clientes.find(c => c.id === selectedProject?.cliente_id);
       
       const avaliacaoData = {
@@ -870,92 +860,19 @@ const AIImageAnalysis = () => {
         </div>
 
         <div style={{ ...styles.card, marginTop: '12px' }}>
-          <h3 style={styles.sectionTitle}>Configuração de APIs</h3>
+          <h3 style={styles.sectionTitle}>Integrações do servidor</h3>
+          <p style={{ color: '#4b5563', marginTop: 0 }}>
+            As chaves ficam exclusivamente no backend. Esta tela apenas informa a disponibilidade dos serviços para sua organização.
+          </p>
           <div style={styles.row}>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>OpenAI API Key</label>
-              <input type="password" value={apiKeys.OPENAI} onChange={(e)=>setApiKeys(prev=>({ ...prev, OPENAI: e.target.value }))} style={styles.input} placeholder="sk-..." />
-            </div>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Anthropic API Key</label>
-              <input type="password" value={apiKeys.ANTHROPIC} onChange={(e)=>setApiKeys(prev=>({ ...prev, ANTHROPIC: e.target.value }))} style={styles.input} placeholder="api_key" />
-            </div>
+            <div style={styles.formGroup}><strong>Gemini</strong><div>{integrationStatus.gemini?.configured ? `Configurado (${integrationStatus.gemini.model || 'modelo padrão'})` : 'Não configurado'}</div></div>
+            <div style={styles.formGroup}><strong>Mapas e geolocalização</strong><div>{integrationStatus.maps?.configured ? 'Configurado' : 'Não configurado'}</div></div>
           </div>
           <div style={styles.row}>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Google Vision API Key</label>
-              <input type="password" value={apiKeys.GOOGLE_VISION} onChange={(e)=>setApiKeys(prev=>({ ...prev, GOOGLE_VISION: e.target.value }))} style={styles.input} placeholder="AIza..." />
-            </div>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>OpenCage API Key</label>
-              <input type="password" value={apiKeys.OPENCAGE} onChange={(e)=>setApiKeys(prev=>({ ...prev, OPENCAGE: e.target.value }))} style={styles.input} placeholder="opencage-key" />
-            </div>
+            <div style={styles.formGroup}><strong>Gateway local</strong><div>{integrationStatus.local_gateway?.configured ? 'Configurado' : 'Não configurado'}</div></div>
+            <div style={styles.formGroup}><strong>Billing</strong><div>{integrationStatus.billing?.configured ? 'Configurado' : 'Modo controlado'}</div></div>
           </div>
-          <div style={styles.row}>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Mapbox Token</label>
-              <input type="password" value={apiKeys.MAPBOX} onChange={(e)=>setApiKeys(prev=>({ ...prev, MAPBOX: e.target.value }))} style={styles.input} placeholder="pk.ey..." />
-            </div>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Google Maps Geocoding Key</label>
-              <input type="password" value={apiKeys.GOOGLE_MAPS} onChange={(e)=>setApiKeys(prev=>({ ...prev, GOOGLE_MAPS: e.target.value }))} style={styles.input} placeholder="AIza..." />
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-            <button
-              onClick={()=>{
-                ApiKeyStore.set('OPENAI', apiKeys.OPENAI);
-                ApiKeyStore.set('ANTHROPIC', apiKeys.ANTHROPIC);
-                ApiKeyStore.set('GOOGLE_VISION', apiKeys.GOOGLE_VISION);
-                ApiKeyStore.set('OPENCAGE', apiKeys.OPENCAGE);
-                ApiKeyStore.set('MAPBOX', apiKeys.MAPBOX);
-                ApiKeyStore.set('GOOGLE_MAPS', apiKeys.GOOGLE_MAPS);
-                setProvidersStatus({
-                  openai: !!apiKeys.OPENAI,
-                  anthropic: !!apiKeys.ANTHROPIC,
-                  googleVision: !!apiKeys.GOOGLE_VISION,
-                  geocode: !!(apiKeys.OPENCAGE || apiKeys.MAPBOX || apiKeys.GOOGLE_MAPS)
-                });
-                alert('Chaves salvas localmente. Reinicie a análise para aplicar.');
-              }}
-              style={{ ...styles.button, ...styles.primaryButton }}
-            >
-              Salvar Chaves
-            </button>
-            <button
-              onClick={async ()=>{
-                try {
-                  const adminToken = localStorage.getItem('geomind_admin_token') || '';
-                  await api.post(API_ENDPOINTS.integracoes.apis, {
-                    OPENAI: apiKeys.OPENAI,
-                    ANTHROPIC: apiKeys.ANTHROPIC,
-                    GOOGLE_VISION: apiKeys.GOOGLE_VISION,
-                    OPENCAGE: apiKeys.OPENCAGE,
-                    MAPBOX: apiKeys.MAPBOX,
-                    GOOGLE_MAPS: apiKeys.GOOGLE_MAPS
-                  }, { headers: { 'x-admin-token': adminToken } });
-                  const statusResp = await api.get(API_ENDPOINTS.integracoes.apis);
-                  const st = statusResp.data?.status || {};
-                  setProvidersStatus({
-                    openai: !!st.OPENAI,
-                    anthropic: !!st.ANTHROPIC,
-                    googleVision: !!st.GOOGLE_VISION,
-                    geocode: !!(st.OPENCAGE || st.MAPBOX || st.GOOGLE_MAPS)
-                  });
-                  alert('Chaves salvas no servidor com sucesso.');
-                } catch (e) {
-                  if (isDev) console.error('Erro ao salvar chaves no servidor:', e);
-                  alert('Erro ao salvar no servidor. Verifique o token admin.');
-                }
-              }}
-              style={{ ...styles.button, backgroundColor: '#0ea5e9', color: 'white' }}
-            >
-              Salvar no Servidor
-            </button>
-            <div style={{ alignSelf: 'center', fontSize: '12px', color: '#6b7280' }}>
-              OpenAI: {providersStatus.openai ? 'ok' : 'off'} | Anthropic: {providersStatus.anthropic ? 'ok' : 'off'} | Google Vision: {providersStatus.googleVision ? 'ok' : 'off'} | Geocoding: {providersStatus.geocode ? 'ok' : 'off'}
-            </div>
-          </div>
+          <button onClick={loadIntegrationStatus} style={{ ...styles.button, ...styles.secondaryButton }}>Atualizar status</button>
         </div>
         
         {error && <div style={styles.error}>{error}</div>}

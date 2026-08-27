@@ -1,0 +1,179 @@
+openapi: 3.0.3
+info:
+  title: GeoMind API
+  version: 1.0.0
+  description: API multi-organização para avaliação imobiliária, evidências, IA, geointeligência, billing controlado e sincronização.
+servers:
+  - url: http://localhost:3001
+    description: Desenvolvimento local
+paths:
+  /health:
+    get:
+      summary: Saúde da API e do banco
+      responses:
+        '200': { description: Serviço saudável }
+        '503': { description: Banco indisponível }
+  /metrics:
+    get:
+      summary: Métricas Prometheus
+      responses:
+        '200': { description: Métricas textuais }
+        '401': { description: Token de métricas inválido quando configurado }
+  /api/v1/usuarios/register:
+    post:
+      summary: Cria organização e proprietário
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterInput'
+      responses:
+        '201': { description: Usuário criado e sessão emitida }
+        '400': { description: Dados inválidos }
+  /api/v1/usuarios/login:
+    post:
+      summary: Inicia sessão
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+      responses:
+        '200': { description: Sessão emitida em cookie HttpOnly }
+        '401': { description: Credenciais inválidas }
+  /api/v1/usuarios/perfil:
+    get:
+      summary: Consulta sessão autenticada
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: Usuário atual }
+        '401': { description: Não autenticado }
+    patch:
+      summary: Atualiza nome e email
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileInput'
+      responses:
+        '200': { description: Perfil atualizado }
+        '409': { description: Email já utilizado }
+  /api/v1/dashboard:
+    get:
+      summary: Indicadores da organização
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: Contadores reais do domínio }
+  /api/v1/evidencias/{evidenceId}/analise-ia:
+    post:
+      summary: Analisa imagem com Gemini server-side
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/EvidenceId'
+        - in: header
+          name: Idempotency-Key
+          schema: { type: string, maxLength: 160 }
+      responses:
+        '201': { description: Análise estruturada criada }
+        '429': { description: Limite temporário do provedor }
+        '503': { description: Gemini não configurado }
+  /api/v1/evidencias/{evidenceId}/analises-ia/{analysisId}:
+    patch:
+      summary: Aprova, edita ou rejeita uma análise
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/EvidenceId'
+        - $ref: '#/components/parameters/AnalysisId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, enum: [approve, edit, reject] }
+                output: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Estado de revisão atualizado }
+        '404': { description: Análise não pertence à organização }
+  /api/v1/projetos/{projectId}/geografia:
+    post:
+      summary: Busca POIs por categoria com distância e contexto factual
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '201': { description: Contexto geográfico persistido }
+        '503': { description: Provedor de mapas não configurado }
+  /api/v1/billing/payment-methods:
+    get:
+      summary: Lista métodos tokenizados
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: Métodos sem provider_token }
+    post:
+      summary: Registra token de gateway
+      security: [{ cookieAuth: [] }]
+      responses:
+        '201': { description: Método tokenizado criado }
+  /api/v1/backup:
+    get:
+      summary: Lista backups da organização
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: Metadados de backup }
+    post:
+      summary: Cria snapshot comprimido
+      security: [{ cookieAuth: [] }]
+      responses:
+        '201': { description: Backup criado }
+  /sync/events:
+    post:
+      summary: Recebe lote de eventos do gateway híbrido
+      parameters:
+        - in: header
+          name: X-GeoMind-Organization
+          required: true
+          schema: { type: string }
+        - in: header
+          name: X-GeoMind-Signature
+          schema: { type: string }
+      responses:
+        '202': { description: Eventos recebidos idempotentemente }
+        '401': { description: Assinatura inválida }
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: geomind_session
+  parameters:
+    EvidenceId: { in: path, name: evidenceId, required: true, schema: { type: integer, minimum: 1 } }
+    AnalysisId: { in: path, name: analysisId, required: true, schema: { type: integer, minimum: 1 } }
+    ProjectId: { in: path, name: projectId, required: true, schema: { type: integer, minimum: 1 } }
+  schemas:
+    RegisterInput:
+      type: object
+      required: [name, email, password]
+      properties:
+        name: { type: string, minLength: 2 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        organization_name: { type: string }
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+    ProfileInput:
+      type: object
+      required: [name, email]
+      properties:
+        name: { type: string, minLength: 2 }
+        email: { type: string, format: email }

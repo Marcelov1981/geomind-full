@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { API_ENDPOINTS } from '../config/api';
-import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
 import CepService from '../utils/CepService';
 
-const CadastroUsuario = ({ onNavigateToPlanos }) => {
+const CadastroUsuario = ({ onNavigateToPlanos, onRegistered }) => {
+  const { register } = useAuth();
   const [tipoUsuario, setTipoUsuario] = useState('pessoa_fisica'); // pessoa_fisica ou pessoa_juridica
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -142,18 +142,25 @@ const CadastroUsuario = ({ onNavigateToPlanos }) => {
     
     try {
       const dadosEnvio = {
-        ...formData,
-        tipoUsuario
+        name: formData.nomeResponsavel || formData.nome,
+        email: formData.email,
+        password: formData.senha,
+        organization_name: tipoUsuario === 'pessoa_juridica'
+          ? (formData.razaoSocial || formData.nomeFantasia)
+          : formData.nome,
       };
-      
-      await axios.post(API_ENDPOINTS.usuarios.register, dadosEnvio);
-      
-      setSuccess('Usuário cadastrado com sucesso! Agora você pode configurar suas formas de pagamento.');
-      setShowFormasPagamento(true);
+
+      const response = await register(dadosEnvio);
+      if (onRegistered) {
+        onRegistered(response);
+      } else {
+        setSuccess('Usuário cadastrado com sucesso! A sessão já está ativa.');
+        setShowFormasPagamento(true);
+      }
       
     } catch (error) {
       console.error('Erro ao cadastrar usuário:', error);
-      setError(error.response?.data?.message || 'Erro ao cadastrar usuário');
+      setError(error.response?.data?.error || error.response?.data?.message || 'Erro ao cadastrar usuário');
     } finally {
       setLoading(false);
     }

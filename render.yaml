@@ -1,14 +1,13 @@
 services:
   - type: web
-    name: sistema-avaliacao-frontend
+    name: geomind-frontend
+
     env: static
     plan: free
-    buildCommand: npm install && npm run build
+    buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
     envVars:
       - key: VITE_API_BASE_URL
-        value: https://sistema-avaliacao-backend.onrender.com/api/v1
-      - key: VITE_GEMINI_API_KEY
-        value: AIzaSyCc3gYZ6IYcJxdLAQJqa8fDMVc2uptAhTg
+        value: https://SEU-BACKEND-ORIGIN/api/v1
       - key: VITE_BACKEND_URL
-        value: https://sistema-avaliacao-backend.onrender.com
+        value: https://SEU-BACKEND-ORIGIN

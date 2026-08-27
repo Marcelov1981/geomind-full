@@ -1,0 +1,43 @@
+name: GeoMind CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Test API
+        run: npm test
+        env:
+          NODE_ENV: test
+          VITEST: true
+          DATABASE_URL: sqlite::memory:
+          BILLING_PROVIDER: local
+      - name: Build frontend
+        run: npm run build
+      - name: Dependency audit
+        run: npm audit --omit=dev --audit-level=high
+      - name: Secret scan
+        run: |
+          ! grep -RIn --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=decks -E 'AIza[[:alnum:]_-]{20,}|sk-[[:alnum:]_-]{20,}|BEGIN (RSA|EC|OPENSSH) PRIVATE KEY' .
+      - name: Check migrations
+        run: npm run migrate
