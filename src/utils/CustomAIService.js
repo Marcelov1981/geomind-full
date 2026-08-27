@@ -13,9 +13,7 @@ import ApiKeyStore from './ApiKeyStore.js';
 // Helper para compatibilidade entre Vite e Node.js
 const getEnv = (key) => {
   try {
-    // eslint-disable-next-line
     if (typeof import.meta !== 'undefined' && import.meta.env) {
-      // eslint-disable-next-line
       return import.meta.env[key];
     }
   } catch {

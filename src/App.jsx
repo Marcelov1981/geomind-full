@@ -1,34 +1,32 @@
-import React, { useState, useEffect } from 'react';
-import Clientes from './components/Cliente';
-import Orcamentos from './components/Orcamentos';
-import Projetos from './components/Projetos';
-import Avaliacao from './components/Avaliacao';
-import Laudos from './components/Laudos';
-import NovoCliente from './components/NovoCliente';
-import NovoProjeto from './components/NovoProjeto';
-import NovoOrcamento from './components/NovoOrcamento';
-import NovoLaudo from './components/NovoLaudo';
-import NovaAvaliacao from './components/NovaAvaliacao';
-import PropertyAnalysisSystem from './components/PropertyAnalysisSystem';
-import AIImageAnalysis from './components/AIImageAnalysis';
-import ConfiguracaoLogo from './components/ConfiguracaoLogo';
-import ConfiguracoesGerais from './components/ConfiguracoesGerais';
-import EdicaoConfiguracoes from './components/EdicaoConfiguracoes';
-import PlanosAssinatura from './components/PlanosAssinatura';
-import PagamentoPagina from './components/PagamentoPagina';
-import PagamentoSucesso from './components/PagamentoSucesso';
-import PerfilUsuario from './components/PerfilUsuario';
-import GerenciamentoCartoes from './components/GerenciamentoCartoes';
-import PrivacidadeLGPD from './components/PrivacidadeLGPD';
-import GerenciamentoCreditos from './components/GerenciamentoCreditos';
-import CadastroUsuario from './components/CadastroUsuario';
-import FormasPagamento from './components/FormasPagamento';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import CustomHeader from './components/CustomHeader';
-import CompleteWorkflow from './components/CompleteWorkflow';
-import DataIntegrityReport from './components/DataIntegrityReport';
 import { ProjectProvider } from './contexts/ProjectContext';
-
 import { appStyles, getSidebarStyles, otherStyles } from './styles/appStyles';
+
+const Clientes = lazy(() => import('./components/Cliente'));
+const Orcamentos = lazy(() => import('./components/Orcamentos'));
+const Projetos = lazy(() => import('./components/Projetos'));
+const Avaliacao = lazy(() => import('./components/Avaliacao'));
+const Laudos = lazy(() => import('./components/Laudos'));
+const NovoCliente = lazy(() => import('./components/NovoCliente'));
+const NovoProjeto = lazy(() => import('./components/NovoProjeto'));
+const NovoOrcamento = lazy(() => import('./components/NovoOrcamento'));
+const NovoLaudo = lazy(() => import('./components/NovoLaudo'));
+const NovaAvaliacao = lazy(() => import('./components/NovaAvaliacao'));
+const PropertyAnalysisSystem = lazy(() => import('./components/PropertyAnalysisSystem'));
+const AIImageAnalysis = lazy(() => import('./components/AIImageAnalysis'));
+const ConfiguracaoLogo = lazy(() => import('./components/ConfiguracaoLogo'));
+const ConfiguracoesGerais = lazy(() => import('./components/ConfiguracoesGerais'));
+const EdicaoConfiguracoes = lazy(() => import('./components/EdicaoConfiguracoes'));
+const PlanosAssinatura = lazy(() => import('./components/PlanosAssinatura'));
+const PagamentoPagina = lazy(() => import('./components/PagamentoPagina'));
+const PagamentoSucesso = lazy(() => import('./components/PagamentoSucesso'));
+const PerfilUsuario = lazy(() => import('./components/PerfilUsuario'));
+const GerenciamentoCartoes = lazy(() => import('./components/GerenciamentoCartoes'));
+const CadastroUsuario = lazy(() => import('./components/CadastroUsuario'));
+const FormasPagamento = lazy(() => import('./components/FormasPagamento'));
+const CompleteWorkflow = lazy(() => import('./components/CompleteWorkflow'));
+const DataIntegrityReport = lazy(() => import('./components/DataIntegrityReport'));
 
 const SaaSApp = () => {
   
@@ -46,8 +44,6 @@ const SaaSApp = () => {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [dadosNavegacao, setDadosNavegacao] = useState({});
 
-  useEffect(() => {}, []);
-
   // Reset global styles
   useEffect(() => {
     document.body.style.margin = '0';
@@ -62,12 +58,12 @@ const SaaSApp = () => {
   }, []);
 
   // Combina estilos estáticos com estilos dinâmicos
-  const sidebarStyles = getSidebarStyles(sidebarOpen);
-  const styles = {
+  const sidebarStyles = useMemo(() => getSidebarStyles(sidebarOpen), [sidebarOpen]);
+  const styles = useMemo(() => ({
     ...appStyles,
     ...sidebarStyles,
     ...otherStyles
-  };
+  }), [sidebarStyles]);
 
   // Ícones SVG
   const icons = {
@@ -314,8 +310,7 @@ const SaaSApp = () => {
               <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
                 <FormasPagamento 
                   planoSelecionado={selectedPlan}
-                  onPagamentoConfigurado={(dadosPagamento) => {
-                    console.log('Pagamento configurado:', dadosPagamento);
+                  onPagamentoConfigurado={() => {
                     setActiveSection('dashboard');
                   }}
                 />
@@ -597,13 +592,13 @@ const SaaSApp = () => {
       <div style={styles.mainContent}>
         <CustomHeader />
         <div style={styles.contentArea}>
-          {renderContent()}
+          <Suspense fallback={<div style={{ padding: '32px', textAlign: 'center', color: '#64748b' }}>Carregando módulo...</div>}>
+            {renderContent()}
+          </Suspense>
         </div>
       </div>
     );
   };
-
-  console.log('Renderização principal');
 
   return (
     <ProjectProvider>
@@ -613,36 +608,29 @@ const SaaSApp = () => {
           <MainContent />
         </div>
 
+        <Suspense fallback={null}>
         <NovoCliente
           isOpen={showNovoCliente}
           onClose={() => setShowNovoCliente(false)}
-          onClienteCreated={() => {
-            console.log('Cliente criado com sucesso!');
-          }}
+          onClienteCreated={() => {}}
         />
         
         <NovoProjeto
           isOpen={showNovoProjeto}
           onClose={() => setShowNovoProjeto(false)}
-          onProjetoCreated={() => {
-            console.log('Projeto criado com sucesso!');
-          }}
+          onProjetoCreated={() => {}}
         />
         
         <NovoOrcamento
           isOpen={showNovoOrcamento}
           onClose={() => setShowNovoOrcamento(false)}
-          onOrcamentoCreated={() => {
-            console.log('Orçamento criado com sucesso!');
-          }}
+          onOrcamentoCreated={() => {}}
         />
         
         <NovoLaudo
           isOpen={showNovoLaudo}
           onClose={() => setShowNovoLaudo(false)}
-          onLaudoCreated={() => {
-            console.log('Laudo criado com sucesso!');
-          }}
+          onLaudoCreated={() => {}}
         />
         
         <NovaAvaliacao
@@ -650,7 +638,6 @@ const SaaSApp = () => {
           onClose={() => setShowNovaAvaliacao(false)}
           onAvaliacaoCreated={() => {
             setShowNovaAvaliacao(false);
-            console.log('Avaliação criada com sucesso!');
           }}
         />
         
@@ -672,6 +659,7 @@ const SaaSApp = () => {
           }}
           tipoConfiguracao={tipoEdicaoConfiguracao}
         />
+        </Suspense>
       </div>
     </ProjectProvider>
   );

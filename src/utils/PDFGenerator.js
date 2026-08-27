@@ -1,5 +1,4 @@
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
 import { addLogoToPDF } from './LogoUtils.jsx';
 import SafariCompatibility from './SafariCompatibility.js';
 

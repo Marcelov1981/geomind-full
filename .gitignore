@@ -30,3 +30,7 @@ dist-ssr
 # Secrets
 .env
 backend/**/.env
+
+# Arquivos locais e dados potencialmente sensíveis
+*.xlsm
+*.xlsx

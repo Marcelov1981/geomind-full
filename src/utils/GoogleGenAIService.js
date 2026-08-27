@@ -3,9 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 // Helper para compatibilidade entre Vite e Node.js
 const getEnv = (key) => {
   try {
-    // eslint-disable-next-line
     if (typeof import.meta !== 'undefined' && import.meta.env) {
-      // eslint-disable-next-line
       return import.meta.env[key];
     }
   } catch {
@@ -31,17 +29,24 @@ const getEnv = (key) => {
  */
 class GoogleGenAIService {
   constructor() {
-    this.apiKey = getEnv('VITE_GEMINI_API_KEY') || 'AIzaSyCc3gYZ6IYcJxdLAQJqa8fDMVc2uptAhTg';
-    
+    this.apiKey = getEnv('VITE_GEMINI_API_KEY');
+    this.genAI = null;
+    this.model = null;
+  }
+
+  ensureConfigured() {
+    if (this.model) return;
+
     if (!this.apiKey) {
-      throw new Error('VITE_GEMINI_API_KEY não está configurada. Verifique seu arquivo .env');
+      throw new Error('VITE_GEMINI_API_KEY não está configurada. Verifique seu arquivo .env.local');
     }
-    
-    // Inicializa o cliente usando a nova biblioteca
+
     this.genAI = new GoogleGenerativeAI(this.apiKey);
     this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    
-    console.log('✅ GoogleGenAIService inicializado com sucesso');
+
+    if (getEnv('MODE') !== 'production') {
+      console.debug('GoogleGenAIService inicializado');
+    }
   }
 
   /**
@@ -70,6 +75,7 @@ class GoogleGenAIService {
    */
   async analyzeImage(imageFile, prompt = '', propertyInfo = null, retries = 3) {
     try {
+      this.ensureConfigured();
       console.log('🤖 Iniciando análise com Google GenAI...');
       
       // Converte imagem para base64

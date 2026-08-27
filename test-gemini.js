@@ -1,11 +1,18 @@
-// Teste da API do Gemini
-const GEMINI_API_KEY = 'AIzaSyCc3gYZ6IYcJxdLAQJqa8fDMVc2uptAhTg';
+/* global process */
+
+const GEMINI_API_KEY = process.env.VITE_GEMINI_API_KEY;
 
 async function testGemini() {
+  if (!GEMINI_API_KEY) {
+    console.error('VITE_GEMINI_API_KEY não configurada. Defina a variável no ambiente antes de executar este teste.');
+    process.exitCode = 1;
+    return false;
+  }
+
   try {
-    console.log('🧪 Testando API do Gemini...');
-    
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+    console.log('Testando API do Gemini...');
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -18,19 +25,21 @@ async function testGemini() {
         }]
       })
     });
-    
+
     const data = await response.json();
-    
-    if (response.ok && data.candidates && data.candidates[0]) {
-      console.log('✅ API Gemini funcionando!');
-      console.log('📝 Resposta:', data.candidates[0].content.parts[0].text);
+
+    if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+      console.log('API Gemini funcionando!');
+      console.log('Resposta:', data.candidates[0].content.parts[0].text);
       return true;
-    } else {
-      console.error('❌ Erro na API Gemini:', data);
-      return false;
     }
+
+    console.error('Erro na API Gemini:', data.error?.message || `HTTP ${response.status}`);
+    process.exitCode = 1;
+    return false;
   } catch (error) {
-    console.error('💥 Erro ao testar Gemini:', error);
+    console.error('Erro ao testar Gemini:', error.message);
+    process.exitCode = 1;
     return false;
   }
 }

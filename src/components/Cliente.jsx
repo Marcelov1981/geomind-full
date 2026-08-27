@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
-import { API_ENDPOINTS } from '../config/api';
+import api, { API_ENDPOINTS } from '../config/api';
 import EditarCliente from './EditarCliente';
 
 function Clientes() {
@@ -16,18 +15,12 @@ function Clientes() {
         setLoading(true);
         setError(null);
         
-        const response = await axios.get(API_ENDPOINTS.clientes.base);
-        
-        console.log("Dados recebidos:", response.data); // Debug
-        
-        // Verificar se a resposta tem o formato esperado
-        if (response.data.success) {
-          setClientesList(response.data.data || []);
-        } else {
-          setClientesList(response.data || []);
-        }
+        const response = await api.get(API_ENDPOINTS.clientes.base);
+        const payload = response.data;
+        const clientes = Array.isArray(payload) ? payload : (payload?.data || []);
+        setClientesList(Array.isArray(clientes) ? clientes : []);
       } catch (error) {
-        console.error("Erro ao buscar clientes:", error);
+        if (import.meta.env.DEV) console.error('Erro ao buscar clientes:', error);
         setError("Erro ao carregar clientes. Tente novamente mais tarde.");
       } finally {
         setLoading(false);
@@ -60,7 +53,7 @@ function Clientes() {
   return (
     <>
       {clientesList.map((cliente, index) => ( 
-        <tr key={index}>
+        <tr key={cliente.id ?? cliente._id ?? `cliente-${index}`}>
           <td>{cliente.nome || 'N/A'}</td>
           <td>{cliente.email}</td>
           <td> 
@@ -106,7 +99,9 @@ function Clientes() {
           // Atualizar a lista de clientes
           setClientesList(prev => 
             prev.map(cliente => 
-              cliente.id === clienteAtualizado.id ? clienteAtualizado : cliente
+              String(cliente.id ?? cliente._id) === String(clienteAtualizado.id ?? clienteAtualizado._id)
+                ? clienteAtualizado
+                : cliente
             )
           );
           setEditModalOpen(false);

@@ -14,6 +14,23 @@ function setCached(key, value) {
   cache.set(key, { v: value, t: Date.now() });
 }
 
+async function getCachedOrFetch(key, request) {
+  const cached = getCached(key);
+  if (cached) return cached;
+  const value = await request();
+  setCached(key, value);
+  return value;
+}
+
+function invalidateCache(...keys) {
+  keys.forEach((key) => cache.delete(key));
+}
+
+function sameId(left, right) {
+  if (left === null || left === undefined || right === null || right === undefined) return false;
+  return String(left) === String(right);
+}
+
 function normalizeId(doc) {
   if (!doc) return doc;
   const id = doc.id ?? doc._id;
@@ -39,30 +56,35 @@ class RelationshipService {
     try {
       const pKey = `projetos:${projectId}`;
       const oKey = `orcamentos:list`;
-      const projectResponse = getCached(pKey) || await api.get(`${API_ENDPOINTS.projetos.base}/${projectId}`);
-      const orcamentosResponse = getCached(oKey) || await api.get(API_ENDPOINTS.orcamentos.base);
-      setCached(pKey, projectResponse);
-      setCached(oKey, orcamentosResponse);
+      const [projectResponse, orcamentosResponse] = await Promise.all([
+        getCachedOrFetch(pKey, () => api.get(`${API_ENDPOINTS.projetos.base}/${projectId}`)),
+        getCachedOrFetch(oKey, () => api.get(API_ENDPOINTS.orcamentos.base))
+      ]);
 
       const project = normalizeId(projectResponse.data?.data ?? projectResponse.data);
       const allOrcamentos = (orcamentosResponse.data?.data ?? orcamentosResponse.data ?? []).map(normalizeOrcamento);
       let allAvaliacoes = [];
       try {
         const aKey = `avaliacoes:list`;
-        const avaliacoesResponse = getCached(aKey) || await api.get(API_ENDPOINTS.avaliacoes.base);
-        setCached(aKey, avaliacoesResponse);
+        const avaliacoesResponse = await getCachedOrFetch(aKey, () => api.get(API_ENDPOINTS.avaliacoes.base));
         allAvaliacoes = avaliacoesResponse.data?.data ?? avaliacoesResponse.data ?? [];
       } catch {
         allAvaliacoes = [];
       }
 
       // Filtrar orçamentos do projeto
-      const projectOrcamentos = allOrcamentos.filter(o => (o.projeto_id ?? o.projetoId) === (project.id ?? projectId));
+      const projectOrcamentos = allOrcamentos.filter(o => sameId(
+        o.projeto_id ?? o.projetoId,
+        project.id ?? projectId
+      ));
       
       // Filtrar avaliações do projeto
       const projectAvaliacoes = allAvaliacoes
         .map(normalizeId)
-        .filter(a => (a.projeto_id ?? a.projetoId) === (project.id ?? projectId));
+        .filter(a => sameId(
+          a.projeto_id ?? a.projetoId,
+          project.id ?? projectId
+        ));
 
       return {
         ...project,
@@ -82,30 +104,35 @@ class RelationshipService {
     try {
       const oKey = `orcamentos:${orcamentoId}`;
       const pKey = `projetos:list`;
-      const orcamentoResponse = getCached(oKey) || await api.get(`${API_ENDPOINTS.orcamentos.base}/${orcamentoId}`);
-      const projetosResponse = getCached(pKey) || await api.get(API_ENDPOINTS.projetos.base);
-      setCached(oKey, orcamentoResponse);
-      setCached(pKey, projetosResponse);
+      const [orcamentoResponse, projetosResponse] = await Promise.all([
+        getCachedOrFetch(oKey, () => api.get(`${API_ENDPOINTS.orcamentos.base}/${orcamentoId}`)),
+        getCachedOrFetch(pKey, () => api.get(API_ENDPOINTS.projetos.base))
+      ]);
 
       const orcamento = normalizeOrcamento(orcamentoResponse.data?.data ?? orcamentoResponse.data);
       const allProjetos = (projetosResponse.data?.data ?? projetosResponse.data ?? []).map(normalizeId);
       let allAvaliacoes = [];
       try {
         const aKey = `avaliacoes:list`;
-        const avaliacoesResponse = getCached(aKey) || await api.get(API_ENDPOINTS.avaliacoes.base);
-        setCached(aKey, avaliacoesResponse);
+        const avaliacoesResponse = await getCachedOrFetch(aKey, () => api.get(API_ENDPOINTS.avaliacoes.base));
         allAvaliacoes = avaliacoesResponse.data?.data ?? avaliacoesResponse.data ?? [];
       } catch {
         allAvaliacoes = [];
       }
 
       // Buscar projeto relacionado
-      const relatedProject = allProjetos.find(p => p.id === (orcamento.projeto_id ?? orcamento.projetoId));
+      const relatedProject = allProjetos.find(p => sameId(
+        p.id,
+        orcamento.projeto_id ?? orcamento.projetoId
+      ));
       
       // Filtrar avaliações do orçamento
       const orcamentoAvaliacoes = allAvaliacoes
         .map(normalizeId)
-        .filter(a => (a.orcamento_id ?? a.orcamentoId) === (orcamento.id ?? orcamentoId));
+        .filter(a => sameId(
+          a.orcamento_id ?? a.orcamentoId,
+          orcamento.id ?? orcamentoId
+        ));
 
       return {
         ...orcamento,
@@ -125,21 +152,25 @@ class RelationshipService {
     try {
       const pKey = `projetos:list`;
       const oKey = `orcamentos:list`;
-      const projetosResponse = getCached(pKey) || await api.get(API_ENDPOINTS.projetos.base);
-      const orcamentosResponse = getCached(oKey) || await api.get(API_ENDPOINTS.orcamentos.base);
-      setCached(pKey, projetosResponse);
-      setCached(oKey, orcamentosResponse);
-
       const aKey = `avaliacoes:${avaliacaoId}`;
-      const avaliacaoResponse = getCached(aKey) || await api.get(`${API_ENDPOINTS.avaliacoes.base}/${avaliacaoId}`);
-      setCached(aKey, avaliacaoResponse);
+      const [projetosResponse, orcamentosResponse, avaliacaoResponse] = await Promise.all([
+        getCachedOrFetch(pKey, () => api.get(API_ENDPOINTS.projetos.base)),
+        getCachedOrFetch(oKey, () => api.get(API_ENDPOINTS.orcamentos.base)),
+        getCachedOrFetch(aKey, () => api.get(`${API_ENDPOINTS.avaliacoes.base}/${avaliacaoId}`))
+      ]);
       const avaliacao = normalizeId(avaliacaoResponse.data?.data ?? avaliacaoResponse.data);
       const allProjetos = (projetosResponse.data?.data ?? projetosResponse.data ?? []).map(normalizeId);
       const allOrcamentos = (orcamentosResponse.data?.data ?? orcamentosResponse.data ?? []).map(normalizeOrcamento);
 
       // Buscar projeto e orçamento relacionados
-      const relatedProject = allProjetos.find(p => p.id === (avaliacao.projeto_id ?? avaliacao.projetoId));
-      const relatedOrcamento = allOrcamentos.find(o => o.id === (avaliacao.orcamento_id ?? avaliacao.orcamentoId));
+      const relatedProject = allProjetos.find(p => sameId(
+        p.id,
+        avaliacao.projeto_id ?? avaliacao.projetoId
+      ));
+      const relatedOrcamento = allOrcamentos.find(o => sameId(
+        o.id,
+        avaliacao.orcamento_id ?? avaliacao.orcamentoId
+      ));
 
       return {
         ...avaliacao,
@@ -160,12 +191,11 @@ class RelationshipService {
       const pKey = `projetos:list`;
       const cKey = `clientes:list`;
       const oKey = `orcamentos:list`;
-      const projetosResponse = getCached(pKey) || await api.get(API_ENDPOINTS.projetos.base);
-      const clientesResponse = getCached(cKey) || await api.get(API_ENDPOINTS.clientes.base);
-      const orcamentosResponse = getCached(oKey) || await api.get(API_ENDPOINTS.orcamentos.base);
-      setCached(pKey, projetosResponse);
-      setCached(cKey, clientesResponse);
-      setCached(oKey, orcamentosResponse);
+      const [projetosResponse, clientesResponse, orcamentosResponse] = await Promise.all([
+        getCachedOrFetch(pKey, () => api.get(API_ENDPOINTS.projetos.base)),
+        getCachedOrFetch(cKey, () => api.get(API_ENDPOINTS.clientes.base)),
+        getCachedOrFetch(oKey, () => api.get(API_ENDPOINTS.orcamentos.base))
+      ]);
 
       const projetos = (projetosResponse.data?.data ?? projetosResponse.data ?? []).map(normalizeId);
       const clientes = (clientesResponse.data?.data ?? clientesResponse.data ?? []).map(normalizeId);
@@ -173,26 +203,38 @@ class RelationshipService {
       let avaliacoes = [];
       try {
         const aKey = `avaliacoes:list`;
-        const avaliacoesResponse = getCached(aKey) || await api.get(API_ENDPOINTS.avaliacoes.base);
-        setCached(aKey, avaliacoesResponse);
+        const avaliacoesResponse = await getCachedOrFetch(aKey, () => api.get(API_ENDPOINTS.avaliacoes.base));
         avaliacoes = avaliacoesResponse.data?.data ?? avaliacoesResponse.data ?? [];
       } catch {
         avaliacoes = [];
       }
 
-      // Criar mapa de relacionamentos
-      const projectsWithRelations = projetos.map(projeto => {
-        const pid = projeto.id;
-        const cid = projeto.cliente_id ?? projeto.clienteId;
-        const projectOrcamentos = orcamentos.filter(o => (o.projeto_id ?? o.projetoId) === pid);
-        const projectAvaliacoes = avaliacoes.map(normalizeId).filter(a => (a.projeto_id ?? a.projetoId) === pid);
-        const relatedClient = clientes.find(c => c.id === cid);
+      // Indexar relacionamentos uma vez para evitar filtros aninhados O(projetos x dados).
+      const clientesById = new Map(clientes.map((cliente) => [String(cliente.id), cliente]));
+      const orcamentosByProjeto = new Map();
+      for (const orcamento of orcamentos) {
+        const projectId = String(orcamento.projeto_id ?? orcamento.projetoId ?? '');
+        const list = orcamentosByProjeto.get(projectId) || [];
+        list.push(orcamento);
+        orcamentosByProjeto.set(projectId, list);
+      }
+      const avaliacoesByProjeto = new Map();
+      for (const avaliacao of avaliacoes.map(normalizeId)) {
+        const projectId = String(avaliacao.projeto_id ?? avaliacao.projetoId ?? '');
+        const list = avaliacoesByProjeto.get(projectId) || [];
+        list.push(avaliacao);
+        avaliacoesByProjeto.set(projectId, list);
+      }
+
+      const projectsWithRelations = projetos.map((projeto) => {
+        const pid = String(projeto.id ?? '');
+        const cid = String(projeto.cliente_id ?? projeto.clienteId ?? '');
 
         return {
           ...projeto,
-          cliente: relatedClient,
-          orcamentos: projectOrcamentos,
-          avaliacoes: projectAvaliacoes
+          cliente: clientesById.get(cid),
+          orcamentos: orcamentosByProjeto.get(pid) || [],
+          avaliacoes: avaliacoesByProjeto.get(pid) || []
         };
       });
 
@@ -217,6 +259,7 @@ class RelationshipService {
         ...orcamentoData,
         projetoId: projectId
       });
+      invalidateCache('orcamentos:list');
       return response.data;
     } catch (error) {
       console.error('Erro ao criar orçamento para projeto:', error);
@@ -234,6 +277,7 @@ class RelationshipService {
         projetoId: projectId,
         orcamentoId: orcamentoId
       });
+      invalidateCache('avaliacoes:list');
       return response.data;
     } catch (error) {
       console.error('Erro ao criar avaliação para orçamento:', error);
@@ -273,6 +317,7 @@ class RelationshipService {
    async createClientWithRelations(clientData) {
      try {
       const response = await api.post(API_ENDPOINTS.clientes.base, clientData);
+      invalidateCache('clientes:list');
       return response;
      } catch (error) {
        console.error('Erro ao criar cliente:', error);
@@ -286,6 +331,7 @@ class RelationshipService {
    async createProjectWithRelations(projectData) {
      try {
       const response = await api.post(API_ENDPOINTS.projetos.base, projectData);
+      invalidateCache('projetos:list');
       return response;
      } catch (error) {
        console.error('Erro ao criar projeto:', error);
@@ -308,7 +354,7 @@ class RelationshipService {
         projetosComOrcamentos: data.projetos.filter(p => p.orcamentos.length > 0).length,
         projetosComAvaliacoes: data.projetos.filter(p => p.avaliacoes.length > 0).length,
         orcamentosSemAvaliacoes: data.orcamentos.filter(o => 
-          !data.avaliacoes.some(a => a.orcamento_id === o.id)
+          !data.avaliacoes.some(a => sameId(a.orcamento_id ?? a.orcamentoId, o.id))
         ).length
       };
 

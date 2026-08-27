@@ -1,21 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useMemo } from 'react';
+
+const PRECO_COLABORADOR_ADICIONAL = Object.freeze({
+  corporativo_basico: 15.90,
+  corporativo_medio: 12.90,
+  corporativo_avancado: 9.90
+});
 
 const PlanosAssinatura = ({ onNavigate, numeroColaboradores = 1 }) => {
-  const [planosAtualizados, setPlanosAtualizados] = useState([]);
-  
-  // Configuração de preços por colaborador adicional
-  const precoColaboradorAdicional = {
-    corporativo_basico: 15.90,
-    corporativo_medio: 12.90,
-    corporativo_avancado: 9.90
-  };
-  
   // Função para calcular preço dinâmico baseado no número de colaboradores
-  const calcularPrecoColaboradores = (plano, numColaboradores) => {
+  const calcularPrecoColaboradores = useCallback((plano, numColaboradores) => {
     if (plano.tipo !== 'corporativo') return plano;
     
     const colaboradoresExtras = Math.max(0, numColaboradores - plano.maxColaboradores);
-    const custoAdicional = colaboradoresExtras * precoColaboradorAdicional[plano.id];
+    const custoAdicional = colaboradoresExtras * PRECO_COLABORADOR_ADICIONAL[plano.id];
     const novoValor = plano.valor + custoAdicional;
     
     return {
@@ -34,9 +31,9 @@ const PlanosAssinatura = ({ onNavigate, numeroColaboradores = 1 }) => {
           ]
         : plano.recursos
     };
-  };
+  }, []);
 
-  const planos = [
+  const planos = useMemo(() => [
     {
       id: 'mensal',
       nome: 'Plano Mensal',
@@ -195,15 +192,12 @@ const PlanosAssinatura = ({ onNavigate, numeroColaboradores = 1 }) => {
       tipo: 'corporativo',
       maxColaboradores: 20
     }
-  ];
+    ], []);
 
-  // Atualizar planos quando o número de colaboradores mudar
-  useEffect(() => {
-    const planosCalculados = planos.map(plano => 
-      calcularPrecoColaboradores(plano, numeroColaboradores)
-    );
-    setPlanosAtualizados(planosCalculados);
-  }, [numeroColaboradores, planos, calcularPrecoColaboradores]);
+  const planosAtualizados = useMemo(
+    () => planos.map(plano => calcularPrecoColaboradores(plano, numeroColaboradores)),
+    [planos, numeroColaboradores, calcularPrecoColaboradores]
+  );
 
   const handleSelecionarPlano = (plano) => {
     // Navegar para página de pagamento

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import jsPDF from 'jspdf';
-import axios from 'axios';
-import { API_ENDPOINTS } from '../config/api';
+import { jsPDF } from 'jspdf';
+import api, { API_ENDPOINTS } from '../config/api';
 import { addLogoToPDF } from '../utils/LogoUtils.jsx';
 
 const LaudoPDF = ({ avaliacao, onClose }) => {
@@ -25,7 +24,7 @@ const LaudoPDF = ({ avaliacao, onClose }) => {
   useEffect(() => {
     const carregarDadosUsuario = async () => {
       try {
-        const response = await axios.get(API_ENDPOINTS.usuarios.profile);
+        const response = await api.get(API_ENDPOINTS.usuarios.profile);
         
         const usuario = response.data.user;
         if (usuario) {
@@ -37,7 +36,7 @@ const LaudoPDF = ({ avaliacao, onClose }) => {
           }));
         }
       } catch (error) {
-        console.error('Erro ao carregar dados do usuário:', error);
+        if (import.meta.env.DEV) console.error('Erro ao carregar dados do usuário:', error);
       } finally {
         setUserLoading(false);
       }
@@ -79,7 +78,7 @@ const LaudoPDF = ({ avaliacao, onClose }) => {
 
   const selectBestImages = (images, maxCount = 3) => {
     // Algoritmo simples para selecionar as melhores imagens baseado no tamanho
-    return images
+    return [...images]
       .sort((a, b) => b.size - a.size) // Ordena por tamanho (maior = melhor qualidade)
       .slice(0, maxCount);
   };
@@ -107,8 +106,9 @@ const LaudoPDF = ({ avaliacao, onClose }) => {
        try {
          // Converter imagem para base64
          const reader = new FileReader();
-         const imageData = await new Promise((resolve) => {
+         const imageData = await new Promise((resolve, reject) => {
            reader.onload = (e) => resolve(e.target.result);
+           reader.onerror = () => reject(new Error(`Falha ao ler ${image.name}`));
            reader.readAsDataURL(image);
          });
          
@@ -123,7 +123,7 @@ const LaudoPDF = ({ avaliacao, onClose }) => {
          doc.text(legendaLines, xPosition, yPosition + imageHeight + 8);
          
        } catch (error) {
-         console.error('Erro ao processar imagem:', error);
+         if (import.meta.env.DEV) console.error('Erro ao processar imagem:', error);
          // Adicionar placeholder em caso de erro
          doc.setDrawColor(200, 200, 200);
          doc.rect(xPosition, yPosition, imageWidth, imageHeight);
@@ -356,7 +356,7 @@ const LaudoPDF = ({ avaliacao, onClose }) => {
       alert('Laudo gerado com sucesso!');
       onClose();
     } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
+      if (import.meta.env.DEV) console.error('Erro ao gerar PDF:', error);
       setError('Erro ao gerar o laudo. Tente novamente.');
     } finally {
       setLoading(false);
@@ -376,9 +376,9 @@ const LaudoPDF = ({ avaliacao, onClose }) => {
         status: 'emitido'
       };
 
-      await axios.post(API_ENDPOINTS.laudos.base, laudoPayload);
+      await api.post(API_ENDPOINTS.laudos.base, laudoPayload);
     } catch (error) {
-      console.error('Erro ao salvar laudo:', error);
+      if (import.meta.env.DEV) console.error('Erro ao salvar laudo:', error);
       // Não bloquear a geração do PDF por erro no backend
     }
   };

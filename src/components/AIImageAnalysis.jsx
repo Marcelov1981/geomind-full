@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import CustomAIService from '../utils/CustomAIService';
 import api, { API_ENDPOINTS } from '../config/api';
 import ApiKeyStore from '../utils/ApiKeyStore.js';
@@ -7,6 +7,8 @@ import SafariNotification from './SafariNotification.jsx';
 import SafariCompatibility from '../utils/SafariCompatibility.js';
 import LaudoPDF from './LaudoPDF';
 import relationshipService from '../services/relationshipService';
+
+const isDev = import.meta.env.MODE !== 'production';
 
 const AIImageAnalysis = () => {
   const [activeTab, setActiveTab] = useState('analysis');
@@ -95,10 +97,53 @@ const AIImageAnalysis = () => {
     }
   };
 
+  // Funções para carregar dados usando relationshipService
+  const fetchClientes = useCallback(async () => {
+    try {
+      setLoadingData(true);
+      const data = await relationshipService.getUserCompleteData();
+      setClientes(data.clientes || []);
+    } catch (error) {
+      if (isDev) console.error('Erro ao carregar clientes:', error);
+      setError('Erro ao carregar clientes');
+    } finally {
+      setLoadingData(false);
+    }
+  }, []);
+
+  const fetchProjetos = useCallback(async (clienteId) => {
+    try {
+      setLoadingData(true);
+      const data = await relationshipService.getUserCompleteData();
+      const projetosCliente = (data.projetos || []).filter((p) => (
+        String(p.cliente_id ?? p.clienteId ?? '') === String(clienteId)
+      ));
+      setProjetos(projetosCliente);
+    } catch (error) {
+      if (isDev) console.error('Erro ao carregar projetos:', error);
+      setError('Erro ao carregar projetos');
+    } finally {
+      setLoadingData(false);
+    }
+  }, []);
+
+  const fetchOrcamentos = useCallback(async (projetoId) => {
+    try {
+      setLoadingData(true);
+      const projectData = await relationshipService.getProjectWithRelations(projetoId);
+      setOrcamentos(projectData.orcamentos || []);
+    } catch (error) {
+      if (isDev) console.error('Erro ao carregar orçamentos:', error);
+      setError('Erro ao carregar orçamentos');
+    } finally {
+      setLoadingData(false);
+    }
+  }, []);
+
   // Carregar dados iniciais
   useEffect(() => {
     fetchClientes();
-  }, []);
+  }, [fetchClientes]);
 
   useEffect(() => {
     try {
@@ -132,7 +177,7 @@ const AIImageAnalysis = () => {
       setOrcamentos([]);
       setSelectedOrcamento('');
     }
-  }, [selectedCliente]);
+  }, [selectedCliente, fetchProjetos]);
 
   // Carregar orçamentos quando projeto for selecionado
   useEffect(() => {
@@ -142,7 +187,7 @@ const AIImageAnalysis = () => {
       setOrcamentos([]);
       setSelectedOrcamento('');
     }
-  }, [selectedProjeto]);
+  }, [selectedProjeto, fetchOrcamentos]);
 
   // Atualizar propertyInfo quando projeto for selecionado
   useEffect(() => {
@@ -160,47 +205,6 @@ const AIImageAnalysis = () => {
       }
     }
   }, [selectedProjeto, projetos]);
-
-  // Funções para carregar dados usando relationshipService
-  const fetchClientes = async () => {
-    try {
-      setLoadingData(true);
-      const data = await relationshipService.getUserCompleteData();
-      setClientes(data.clientes || []);
-    } catch (error) {
-      if (isDev) console.error('Erro ao carregar clientes:', error);
-      setError('Erro ao carregar clientes');
-    } finally {
-      setLoadingData(false);
-    }
-  };
-
-  const fetchProjetos = async (clienteId) => {
-    try {
-      setLoadingData(true);
-      const data = await relationshipService.getUserCompleteData();
-      const projetosCliente = data.projetos.filter(p => p.cliente_id === clienteId);
-      setProjetos(projetosCliente);
-    } catch (error) {
-      if (isDev) console.error('Erro ao carregar projetos:', error);
-      setError('Erro ao carregar projetos');
-    } finally {
-      setLoadingData(false);
-    }
-  };
-
-  const fetchOrcamentos = async (projetoId) => {
-    try {
-      setLoadingData(true);
-      const projectData = await relationshipService.getProjectWithRelations(projetoId);
-      setOrcamentos(projectData.orcamentos || []);
-    } catch (error) {
-      if (isDev) console.error('Erro ao carregar orçamentos:', error);
-      setError('Erro ao carregar orçamentos');
-    } finally {
-      setLoadingData(false);
-    }
-  };
 
   const handleWebscrapingImageUpload = (event) => {
     const files = Array.from(event.target.files || []);
@@ -466,7 +470,6 @@ const AIImageAnalysis = () => {
     }
   };
 
-  const isDev = import.meta.env.MODE !== 'production';
   const generateDetailedReport = () => {
     if (activeTab === 'analysis' && analysisResult) {
       const report = {

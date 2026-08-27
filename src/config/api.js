@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 const API_BASE_URL_DEV = 'http://localhost:3001';
-const API_BASE_URL_PROD = import.meta.env.VITE_API_BASE_URL || 'https://your-backend-url.com';
+const normalizeBaseUrl = (value = '') => value.trim().replace(/\/+$/, '');
+const API_BASE_URL_PROD = normalizeBaseUrl(import.meta.env.VITE_API_BASE_URL);
 
 const DEV_CONFIG = {
   baseURL: API_BASE_URL_DEV,
@@ -13,7 +14,7 @@ const PROD_CONFIG = {
   timeout: 30000,
 };
 
-const config = (import.meta.env.MODE === 'production' || import.meta.env.VITE_API_BASE_URL) ? PROD_CONFIG : DEV_CONFIG;
+const config = (import.meta.env.PROD || import.meta.env.VITE_API_BASE_URL) ? PROD_CONFIG : DEV_CONFIG;
 const API_BASE_URL = config.baseURL;
 
 export const API_BASE_URL_EXPORT = config.baseURL;

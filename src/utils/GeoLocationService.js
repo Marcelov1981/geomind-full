@@ -9,9 +9,7 @@ import ApiKeyStore from './ApiKeyStore.js'
 const getEnv = (key) => {
   // Verifica import.meta.env (Vite)
   try {
-    // eslint-disable-next-line
     if (typeof import.meta !== 'undefined' && import.meta.env) {
-      // eslint-disable-next-line
       return import.meta.env[key];
     }
   } catch {
