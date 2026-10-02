@@ -65,10 +65,31 @@ export const API_CONFIG = {
 
 const api = axios.create(API_CONFIG);
 
+const TOKEN_LS_KEY = 'geomind_token';
+
+api.interceptors.request.use((config) => {
+  const tok = (typeof window !== 'undefined' ? window.localStorage.getItem(TOKEN_LS_KEY) : null) || null;
+  if (tok && !config.headers?.Authorization) {
+    config.headers = { ...(config.headers || {}), Authorization: `Bearer ${tok}` };
+  }
+  return config;
+}, (error) => Promise.reject(error));
+
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const url = response.config?.url || '';
+    if (/\/(login|register|primeiro-login)$/.test(url) && response.data?.token) {
+      try { window.localStorage.setItem(TOKEN_LS_KEY, response.data.token); } catch { /* ignore */ }
+    }
+    const logoutUrl = response.config?.url || '';
+    if (/\/logout$/.test(logoutUrl)) {
+      try { window.localStorage.removeItem(TOKEN_LS_KEY); } catch { /* ignore */ }
+    }
+    return response;
+  },
   (error) => {
     if (error.response?.status === 401 && typeof window !== 'undefined') {
+      try { window.localStorage.removeItem(TOKEN_LS_KEY); } catch { /* ignore */ }
       window.dispatchEvent(new CustomEvent('geomind:session-expired'));
     }
     return Promise.reject(error);

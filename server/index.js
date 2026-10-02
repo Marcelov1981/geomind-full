@@ -168,7 +168,7 @@ const resourceDefinitions = [
   },
   {
     path: 'laudos', table: 'reports', entity: 'report', searchField: 'title',
-    schema: z.object({ project_id: z.number().int().positive(), evaluation_id: z.number().int().positive().optional().nullable(), number: z.string().trim().min(1).max(80), title: z.string().trim().min(2).max(255), status: z.enum(['draft', 'review', 'approved', 'archived']).optional(), template_version: z.string().trim().max(80).optional(), content: z.record(z.string(), z.unknown()).optional().nullable() }),
+    schema: z.object({ project_id: z.number().int().positive(), evaluation_id: z.number().int().positive().optional().nullable(), number: z.string().trim().min(1).max(80), title: z.string().trim().min(2).max(255), status: z.enum(['draft', 'review', 'approved', 'archived']).optional(), template_version: z.string().trim().max(80).optional(), content: z.record(z.string(), z.unknown()).optional().nullable(), approved_by: z.number().int().positive().optional().nullable(), approved_at: z.string().max(40).optional().nullable() }),
   },
 ];
 

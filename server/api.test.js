@@ -1,19 +1,40 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
+import { Buffer } from 'node:buffer';
 import crypto from 'node:crypto';
 import process from 'node:process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import ExcelJS from 'exceljs';
 import { app } from './index.js';
 import { db, closeDatabase } from './db.js';
 
 const agent = request.agent(app);
 let client;
 let project;
+let fixturePath;
 
 beforeAll(async () => {
   await db('organizations').delete();
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'GeoMind Test';
+  workbook.created = new Date();
+  const ws = workbook.addWorksheet('laudo-dados');
+  ws.getCell('A1').value = 'area_util_m2';
+  ws.getCell('B1').value = 72;
+  ws.getCell('A2').value = 'quartos';
+  ws.getCell('B2').value = 2;
+  ws.getCell('A3').value = 'm2_unitario';
+  ws.getCell('C3').value = { formula: 'SUM(B1:B2)', result: 74 };
+  const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+  fixturePath = path.join(os.tmpdir(), `geomind-fixture-${crypto.randomBytes(8).toString('hex')}.xlsx`);
+  fs.writeFileSync(fixturePath, buffer);
 });
 
 afterAll(async () => {
+  if (fixturePath && fs.existsSync(fixturePath)) fs.rmSync(fixturePath, { force: true });
   await closeDatabase();
 });
 
@@ -105,7 +126,7 @@ describe('GeoMind API', () => {
   });
 
   it('analisa planilha XLSX sem executar macros', async () => {
-    const imported = await agent.post(`/api/v1/projetos/${project.id}/importacoes/laudo`).attach('file', '/tmp/geomind-fixture.xlsx');
+    const imported = await agent.post(`/api/v1/projetos/${project.id}/importacoes/laudo`).attach('file', fixturePath);
     expect(imported.status).toBe(201);
     expect(imported.body.status).toBe('analyzed');
     expect(imported.body.integrity_report.occupied_cells).toBe(6);
@@ -139,25 +160,37 @@ describe('GeoMind API', () => {
   });
 
   it('mantém um ledger transacional de créditos', async () => {
-    const topUp = await agent.post('/api/v1/billing/top-up').send({ amount_cents: 500 });
-    expect(topUp.status).toBe(201);
-    expect(topUp.body.novoSaldo).toBe(500);
+    const previousProvider = process.env.BILLING_PROVIDER;
+    try {
+      process.env.BILLING_PROVIDER = 'local';
+      const topUp = await agent.post('/api/v1/billing/top-up').send({ amount_cents: 500 });
+      expect(topUp.status).toBe(201);
+      expect(topUp.body.novoSaldo).toBe(500);
 
-    const consume = await agent.post('/api/v1/billing/consume').send({ amount_cents: 100, type: 'usage' });
-    expect(consume.status).toBe(201);
-    expect(consume.body.novoSaldo).toBe(400);
+      const consume = await agent.post('/api/v1/billing/consume').send({ amount_cents: 100, type: 'usage' });
+      expect(consume.status).toBe(201);
+      expect(consume.body.novoSaldo).toBe(400);
 
-    const summary = await agent.get('/api/v1/billing/summary');
-    expect(summary.body.balance_cents).toBe(400);
+      const summary = await agent.get('/api/v1/billing/summary');
+      expect(summary.body.balance_cents).toBe(400);
+    } finally {
+      process.env.BILLING_PROVIDER = previousProvider;
+    }
   });
 
   it('bloqueia cobrança local em produção', async () => {
     const previousNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
-    const response = await agent.post('/api/v1/billing/top-up').send({ amount_cents: 500 });
-    expect(response.status).toBe(503);
-    expect(response.body.code).toBe('BILLING_NOT_CONFIGURED');
-    process.env.NODE_ENV = previousNodeEnv;
+    const previousProvider = process.env.BILLING_PROVIDER;
+    try {
+      process.env.NODE_ENV = 'production';
+      process.env.BILLING_PROVIDER = 'local';
+      const response = await agent.post('/api/v1/billing/top-up').send({ amount_cents: 500 });
+      expect(response.status).toBe(503);
+      expect(response.body.code).toBe('BILLING_NOT_CONFIGURED');
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+      process.env.BILLING_PROVIDER = previousProvider;
+    }
   });
 
   it('impede acesso de um segundo usuário a outra organização', async () => {

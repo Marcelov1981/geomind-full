@@ -1,13 +1,63 @@
 services:
   - type: web
-    name: geomind-frontend
+    name: geomind-api
+    runtime: docker
+    plan: standard
+    dockerfilePath: ./Dockerfile
+    dockerCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3001"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: geomind-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        value: https://geomind-frontend.onrender.com
+      - key: STORAGE_DIR
+        value: /app/storage
+      - key: BACKUP_RETENTION_DAYS
+        value: "30"
+      - key: METRICS_TOKEN
+        generateValue: true
+      - key: BILLING_PROVIDER
+        value: none
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: GEMINI_PROMPT_VERSION
+        value: image-description-v1
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: BILLING_WEBHOOK_SECRET
+        sync: false
+      - key: SYNC_SHARED_SECRET
+        sync: false
+    disk:
+      name: geomind-storage
+      mountPath: /app/storage
+      sizeGB: 10
 
+  - type: web
+    name: geomind-frontend
     env: static
     plan: free
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
     envVars:
       - key: VITE_API_BASE_URL
-        value: https://SEU-BACKEND-ORIGIN/api/v1
+        value: https://geomind-api.onrender.com
       - key: VITE_BACKEND_URL
-        value: https://SEU-BACKEND-ORIGIN
+        value: https://geomind-api.onrender.com
+
+databases:
+  - name: geomind-db
+    plan: standard
+    databaseName: geomind
+    user: geomind
+    version: "16"
