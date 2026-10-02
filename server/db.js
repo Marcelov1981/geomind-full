@@ -1,19 +1,31 @@
 import process from 'node:process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import knex from 'knex';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dataDir = process.env.GEOMIND_DATA_DIR || path.resolve(__dirname, '..', 'data');
+const isOnVercel = Boolean(process.env.VERCEL) || Boolean(process.env.VERCEL_ENV) || process.platform === 'linux' && fs.existsSync('/var/task') && !fs.existsSync(path.resolve(__dirname, '..', 'data', '.writable_marker')) && process.env.NODE_ENV !== 'test' && !process.env.VITEST;
+
+let dataDir = process.env.GEOMIND_DATA_DIR || path.resolve(__dirname, '..', 'data');
+if (isOnVercel && !process.env.DATABASE_URL?.trim()) {
+  dataDir = path.join(os.tmpdir(), 'geomind-data');
+}
+
 const configuredUrl = process.env.DATABASE_URL?.trim() || '';
 const isPostgres = /^postgres(ql)?:\/\//i.test(configuredUrl);
 
 if (!isPostgres) fs.mkdirSync(dataDir, { recursive: true });
-const sqliteFilename = configuredUrl.startsWith('sqlite:')
+let sqliteFilename = configuredUrl.startsWith('sqlite:')
   ? configuredUrl.slice('sqlite:'.length)
   : path.join(dataDir, process.env.NODE_ENV === 'test' ? 'test.sqlite' : 'geomind.sqlite');
+
+if (isOnVercel && !isPostgres && !configuredUrl.startsWith('sqlite:')) {
+  sqliteFilename = path.join(os.tmpdir(), 'geomind.sqlite');
+  try { fs.mkdirSync(path.dirname(sqliteFilename), { recursive: true }); } catch {}
+}
 
 const quoteIdentifier = (identifier) => `"${String(identifier).replaceAll('"', '""')}"`;
 const normalizeValue = (value) => {

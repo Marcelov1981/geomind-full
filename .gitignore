@@ -38,3 +38,13 @@ backend/**/.env
 /storage/
 /decks/
 coverage/
+.vercel
+
+# Arquivos temporários de debug e geração
+_tmp_*.mjs
+_tmp_*.js
+laudo-vergeis-imagens/
+.vercelignore
+*.sqlite
+*.sqlite-journal
+geomind-*.sqlite*

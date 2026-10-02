@@ -1,12 +1,35 @@
 import process from 'node:process';
 import { Buffer } from 'node:buffer';
+import fsSync from 'node:fs';
 import express from 'express';
+
+(() => {
+  try {
+    const envPath = new URL('../.env', import.meta.url);
+    const raw = fsSync.readFileSync(envPath, 'utf8');
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eq = trimmed.indexOf('=');
+      if (eq < 0) continue;
+      const key = trimmed.slice(0, eq).trim();
+      let value = trimmed.slice(eq + 1).trim();
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      if (!(key in process.env)) process.env[key] = value;
+    }
+  } catch {
+    // .env ausente: usar apenas variaveis do ambiente
+  }
+})();
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import multer from 'multer';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzip, gunzip } from 'node:zlib';
@@ -30,7 +53,10 @@ const gzipAsync = promisify(gzip);
 const gunzipAsync = promisify(gunzip);
 const PORT = Number(process.env.PORT || 3001);
 const MAX_PAGE_SIZE = 100;
-const storageDir = process.env.STORAGE_DIR || path.resolve(__dirname, '..', 'storage');
+const isOnVercelStorage = Boolean(process.env.VERCEL) || Boolean(process.env.VERCEL_ENV);
+const storageDir = isOnVercelStorage
+  ? path.join(os.tmpdir(), 'geomind-storage')
+  : (process.env.STORAGE_DIR || path.resolve(__dirname, '..', 'storage'));
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173')
   .split(',')
   .map((origin) => origin.trim())
@@ -477,30 +503,43 @@ app.post('/api/v1/evidencias/:evidenceId/analise-ia', authenticate, async (req, 
     }
     const absolutePath = path.join(storageDir, evidence.storage_key);
     const data = (await fs.readFile(absolutePath)).toString('base64');
-    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const primaryModel = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+    const fallbackModels = (process.env.GEMINI_FALLBACK_MODELS || 'gemini-2.5-flash').split(',').map((m) => m.trim()).filter(Boolean);
+    const candidateModels = [primaryModel, ...fallbackModels];
     const prompt = String(req.body.prompt || 'Descreva somente o que é visualmente observável. Não infira valor, vício construtivo, segurança estrutural ou conformidade legal. Use indeterminado quando a imagem não sustentar uma conclusão.');
     const ai = new GoogleGenAI({ apiKey });
     let response;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        response = await ai.models.generateContent({
-          model,
-          contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { mimeType: evidence.mime_type, data } }] }],
-          config: { responseMimeType: 'application/json', responseSchema: aiOutputSchema, temperature: 0.1 },
-        });
-        break;
-      } catch (error) {
-        if (!isRetryableAiError(error) || attempt === 2) throw error;
-        await wait(250 * (2 ** attempt));
+    let usedModel = null;
+    let lastError = null;
+    for (const model of candidateModels) {
+      usedModel = model;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          response = await ai.models.generateContent({
+            model,
+            contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { mimeType: evidence.mime_type, data } }] }],
+            config: { responseMimeType: 'application/json', responseSchema: aiOutputSchema, temperature: 0.1 },
+          });
+          lastError = null;
+          break;
+        } catch (error) {
+          lastError = error;
+          const retryable = isRetryableAiError(error) || [503].includes(Number(error?.status || error?.code));
+          if (!retryable || attempt === 1) break;
+          await wait(400 * (2 ** attempt));
+        }
       }
+      if (response && !lastError) break;
     }
+    if (lastError && !response) throw lastError;
     const rawOutput = String(response?.text || '{}').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
     const output = JSON.parse(rawOutput);
     const usage = response?.usageMetadata || {};
+    const model = usedModel || primaryModel;
     const [analysisId] = await db('ai_analyses').insert({ organization_id: req.user.organizationId, evidence_id: evidenceId, provider: 'google-gemini', model, prompt_version: process.env.GEMINI_PROMPT_VERSION || 'image-description-v1', status: 'completed', output: JSON.stringify(output), latency_ms: Date.now() - started, input_tokens: Number(usage.promptTokenCount || 0) || null, output_tokens: Number(usage.candidatesTokenCount || 0) || null, created_at: now(), updated_at: now() });
     if (requestRecord) await db('ai_requests').where({ id: requestRecord.id, organization_id: req.user.organizationId }).update({ status: 'completed', analysis_id: analysisId, updated_at: now() });
     await audit(req, 'ai.analysis_completed', 'ai_analysis', analysisId, { evidence_id: evidenceId, model, idempotent: Boolean(idempotencyKey) });
-    res.status(201).json({ id: analysisId, evidence_id: evidenceId, provider: 'google-gemini', model, status: 'completed', output, input_tokens: usage.promptTokenCount || null, output_tokens: usage.candidatesTokenCount || null, latency_ms: Date.now() - started });
+    res.status(201).json({ id: analysisId, evidence_id: evidenceId, provider: 'google-gemini', model, status: 'completed', primary_model: primaryModel, model_fallback_used: usedModel !== primaryModel, output, input_tokens: usage.promptTokenCount || null, output_tokens: usage.candidatesTokenCount || null, latency_ms: Date.now() - started });
   } catch (error) {
     if (requestRecord) await db('ai_requests').where({ id: requestRecord.id, organization_id: req.user.organizationId }).update({ status: 'failed', error_message: String(error.message || 'Falha na análise'), updated_at: now() });
     if (error?.status === 429) return res.status(429).json({ error: 'Limite temporário do Gemini atingido. Tente novamente mais tarde.', code: 'AI_RATE_LIMITED' });
@@ -575,8 +614,9 @@ app.post('/api/v1/projetos/:projectId/geografia', authenticate, async (req, res,
     if (!apiKey) return res.status(503).json({ error: 'Provedor geográfico não configurado no servidor.', code: 'GEO_NOT_CONFIGURED' });
     const address = String(req.body.address || [project.address, project.city, project.state, project.postal_code].filter(Boolean).join(', ')).trim();
     if (!address && !(project.latitude && project.longitude)) return res.status(400).json({ error: 'Informe endereço ou coordenadas do projeto.' });
+    const hasValidCoords = (rawLat, rawLng) => rawLat !== null && rawLat !== undefined && rawLng !== null && rawLng !== undefined && Math.abs(Number(rawLat)) > 0.0001 && Math.abs(Number(rawLng)) > 0.0001 && Number.isFinite(Number(rawLat)) && Number.isFinite(Number(rawLng));
     let latitude = Number(project.latitude); let longitude = Number(project.longitude); let geocode = null;
-    if ((!Number.isFinite(latitude) || !Number.isFinite(longitude)) && address) {
+    if (!hasValidCoords(project.latitude, project.longitude) && address) {
       const geocodeUrl = new URL('https://maps.googleapis.com/maps/api/geocode/json');
       geocodeUrl.searchParams.set('address', address); geocodeUrl.searchParams.set('key', apiKey); geocodeUrl.searchParams.set('language', 'pt-BR');
       const geocodeResponse = await fetch(geocodeUrl);
@@ -941,7 +981,32 @@ app.use((error, req, res, next) => {
 
 export { app };
 
-if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+let migrationPromise = null;
+async function ensureMigrations() {
+  if (!migrationPromise) {
+    migrationPromise = (async () => {
+      await up(db);
+      await migrateBilling(db);
+      await migrateSync(db);
+      await migrateBackups(db);
+      await migrateSyncInbox(db);
+      await migrateAiRequests(db);
+      await migrateLaudoImports(db);
+    })();
+  }
+  return migrationPromise;
+}
+
+if (process.env.VERCEL) {
+  ensureMigrations().then(() => {
+    console.log(`GeoMind (Vercel) ready — driver=${databaseInfo.driver}`);
+  }).catch((err) => {
+    console.error('GeoMind migrations failed on Vercel:', err);
+  });
+}
+
+if (process.env.NODE_ENV !== 'test' && !process.env.VITEST && !process.env.VERCEL) {
+  await ensureMigrations();
   const server = app.listen(PORT, () => console.log(`GeoMind API running on http://localhost:${PORT}`));
   const shutdown = async () => { server.close(); await closeDatabase(); process.exit(0); };
   process.once('SIGINT', shutdown);
